@@ -62,7 +62,6 @@ Installers:
   NestedInstallerFiles:
   - RelativeFilePath: gliff.exe
     PortableCommandAlias: gliff
-  Scope: user
   InstallerUrl: $(Yaml-Quote $portable.Url)
   InstallerSha256: $($portable.Hash)
 "@

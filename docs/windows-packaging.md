@@ -164,7 +164,9 @@ fork must pass `-Repository owner/repo` and review publisher metadata before
 submission. It emits version, defaultLocale (`en-US`) and installer manifests
 using manifest schema version **1.9.0**, each with a schema URL. The portable
 installer uses `InstallerType: zip`, `NestedInstallerType: portable`, nested
-`gliff.exe` and command alias `gliff` with user scope. The generator hashes the
+`gliff.exe` and command alias `gliff`. The portable stanza omits `Scope`, which
+WinGet does not permit for portable installers; WinGet chooses scope at install
+time. The MSIX stanza retains user scope. The generator hashes the
 actual local ZIP, downloads the canonical public GitHub release asset, and
 requires the hashes to match. A missing URL, different bytes, malformed archive,
 invalid repository/identifier or version fails before writing any manifests.

@@ -50,6 +50,7 @@ try {
     Assert-True ($installer.Contains('NestedInstallerType: portable') -and $installer.Contains('RelativeFilePath: gliff.exe')) 'Portable nested installer missing.'
     Assert-True ($installer.Contains((Get-FileHash $script:FixtureZip).Hash)) 'Must hash actual ZIP bytes.'
     Assert-True ($installer.Contains('ManifestVersion: 1.9.0') -and $installer.Contains('InstallerType: zip')) 'Incorrect installer schema metadata.'
+    Assert-True (-not ($installer -match '(?m)^\s+Scope:')) 'Portable installers must leave scope to winget; a declared scope fails semantic validation.'
     Assert-True (-not $installer.Contains('InstallerType: msix')) 'Unsigned fixture must never yield an MSIX manifest.'
     Assert-True ($fixtureState.Urls[-1] -ceq "https://github.com/spencerbull/gliff/releases/download/v$version/gliff-$version-windows-x64.zip") 'Unexpected public release URL.'
     Assert-Throws { & "$PSScriptRoot/new-winget-manifests.ps1" -PortableZip $script:FixtureZip -OutputDirectory $output -Repository 'https://invalid' } 'owner/name'

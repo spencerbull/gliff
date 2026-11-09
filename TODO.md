@@ -23,8 +23,11 @@ known hurdles, explicit acceptance tests, and evidence requirements.
    Evidence: existing Rust workspace, GTK/Wayland client, reusable proto,
    transport and gliff-sw; no macOS implementation found.
 2. [x] Define Windows scope and validation plan before implementation.
-3. [ ] Implement Windows desktop client, input, session lifecycle and tests.
-4. [ ] Implement portable ZIP, MSIX, winget preparation and branch CI.
+3. [x] Implement Windows desktop client, input, session lifecycle and tests.
+   Worker a2f113f integrated as 9bb96b1; native Windows acceptance still open.
+4. [x] Implement portable ZIP, MSIX, winget preparation and branch CI.
+   Worker 1eeca65 integrated as a542881; fixture/static checks pass, native SDK
+   packaging/install checks still open.
 5. [ ] Establish isolated Windows runtime and a test Hyprland server.
 6. [ ] Pass native Windows build/tests and Linux regression checks.
 7. [ ] Capture real session and installer screenshot/video evidence.
@@ -40,11 +43,11 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
 
 | Stream | Scope | Worker / checkout / branch | State and evidence |
 | --- | --- | --- | --- |
-| Desktop | New `crates/gliff-desktop/` Rust frontend and protocol session | T3 child `windows-desktop-client`, task suffix `0fd12e91-70c6-4251-93c8-c078bd45e52d`; worktree `t3-22515915-fcdf078a1d1de8d9`, branch `t3/windows-rust-desktop-client` | Implementation started; parent integrates commits |
+| Desktop | New `crates/gliff-desktop/` Rust frontend and protocol session | T3 child `windows-desktop-client`, task suffix `0fd12e91-70c6-4251-93c8-c078bd45e52d`; worktree `t3-22515915-fcdf078a1d1de8d9`, branch `t3/windows-rust-desktop-client` | a2f113f inspected and integrated as 9bb96b1. Worker fmt/clippy/104 portable tests passed. Parent reruns full workspace and native CI; Windows cross-build alone blocked on absent MSVC tools, not treated as proof. |
 | Distribution | `packaging/windows/`, `scripts/windows/`, Windows CI | T3 child `windows-distribution-ci`, task suffix `347096b4-ff93-4711-a7e4-a7ca367d0062`; worktree `t3-1342a5d8-4b939796137f936f`, branch `t3/windows-distribution-ci` | Worker commit 1eeca65 inspected and integrated as a542881. Parent reran all 25 PowerShell fixture assertions, parsed 8 scripts, actionlint, 3 Microsoft winget schema validations and PNG dimension/CRC checks; PASS. Native Windows packaging not yet run. |
 | Runtime | Windows VM and real remote session evidence | Parent, local isolated Docker/KVM fallback | omaprox T3 link pending; tailnet denies root, sbull absent; local host has 105 GiB available RAM and 1.5 TiB disk |
 | Runtime readiness | Interactive Windows Cua Driver and SSH setup; no product/repo edits | T3 child `windows-runtime-readiness`, task suffix `283e391b-3bb0-481e-aa9b-1413216a0f8b`, shared checkout read-only; exclusive external `runtime-worker/` artifacts | Windows setup running; parent retains acceptance testing |
-| Review | Independent distribution review | T3 child `windows-packaging-review`, task suffix `fbe6c910-fcb9-4b9f-b020-d3c8daa45a5f`, shared checkout read-only | Reviewing integrated a542881; parent fixes verified findings. Desktop review follows final implementation. |
+| Review | Independent distribution review | T3 child `windows-packaging-review`, task suffix `fbe6c910-fcb9-4b9f-b020-d3c8daa45a5f`, shared checkout read-only | Completed: one P2, portable WinGet stanza must omit Scope. Parent verified upstream WinGet semantic validator, added failing regression, removed Scope only for portable; all 26 fixtures and 3 schemas now pass. Native winget CLI check pending. |
 
 ## Required gates and open questions
 
@@ -86,6 +89,11 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
 - Requested explicit Linux workspace default members (GTK client, server,
   probe) so `bin/build` does not build an unused second frontend for the Arch
   package. Windows builds select gliff-desktop; checks still cover workspace.
+- Parent reproduced a reconnect bug with a new real supervisor/TCP test: an
+  established connection followed by a failed reconnect setup stopped before
+  the third attempt. Preserve established-session retry eligibility across
+  transient setup failures. Test failed before fix; all 13 session integration
+  tests now pass, log `/tmp/gliff-windows-infra/session-tests-after-fix.log`.
 - Fork branch published through d35f895 after full Linux checks passed again.
   Initial HTTPS push lacked a credential helper; command-scoped authenticated
   `gh auth git-credential` helper worked without changing global Git settings.

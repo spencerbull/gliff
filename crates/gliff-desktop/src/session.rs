@@ -88,6 +88,7 @@ impl Session {
                 }
             };
             rt.block_on(async {
+                let mut reconnecting = false;
                 for attempt in 0..3 {
                     if *cancelled.borrow() {
                         break;
@@ -118,8 +119,9 @@ impl Session {
                         break;
                     }
                     let error = result.unwrap_err();
+                    reconnecting |= was_connected;
                     let retry =
-                        was_connected && error.downcast_ref::<Fatal>().is_none() && attempt < 2;
+                        reconnecting && error.downcast_ref::<Fatal>().is_none() && attempt < 2;
                     shared.lock().unwrap().status = format!(
                         "Disconnected: {error:#}{}",
                         if retry {

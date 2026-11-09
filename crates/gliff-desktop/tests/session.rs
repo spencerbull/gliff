@@ -499,6 +499,56 @@ fn clipboard_caps_and_bad_offsets_abort_without_publishing_text() {
 }
 
 #[tokio::test]
+async fn reconnect_survives_a_failed_setup_after_an_established_session() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let mut options = Options::parse_from(["gliff-desktop"]);
+    options.connect = Some(listener.local_addr().unwrap());
+    let mut session = session::Session::start("test".into(), options);
+    for attempt in 0..3 {
+        let (stream, _) = tokio::time::timeout(Duration::from_secs(5), listener.accept())
+            .await
+            .expect("an established session must retry even when the next setup fails")
+            .unwrap();
+        if attempt == 1 {
+            // Model a server still recovering during the first reconnect.
+            drop(stream);
+            continue;
+        }
+        let (read, write) = tokio::io::split(stream);
+        let mut read = Framed::new(read);
+        let mut write = Framed::new(write);
+        assert!(matches!(
+            read.read_msg::<ClientMsg>().await.unwrap(),
+            ClientMsg::Hello { .. }
+        ));
+        write
+            .write_msg(&ServerMsg::HelloAck {
+                version: PROTOCOL_VERSION,
+                session: SessionInfo {
+                    headless: false,
+                    output: "test".into(),
+                },
+                outputs: vec![],
+                features: vec![],
+            })
+            .await
+            .unwrap();
+        write.write_msg(&config(false)).await.unwrap();
+        write.write_msg(&ServerMsg::Ping { t: 47 }).await.unwrap();
+        assert_eq!(
+            read.read_msg::<ClientMsg>().await.unwrap(),
+            ClientMsg::Pong { t: 47 }
+        );
+        if attempt == 2 {
+            assert!(session.state.lock().unwrap().connected);
+            session.disconnect();
+            assert_eq!(read.read_msg::<ClientMsg>().await.unwrap(), ClientMsg::Bye);
+        }
+    }
+    session.shutdown();
+}
+
+#[tokio::test]
 async fn reconnect_stops_after_three_attempts_and_preserves_inactive_clipboard() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let mut options = Options::parse_from(["gliff-desktop"]);
