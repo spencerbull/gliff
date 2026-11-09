@@ -179,3 +179,15 @@ picture-ownership resolution now preserve both axes and consecutive initial
 clicks, while excluding preceding local-control input. Both defect mutations
 fail their regressions; all327 workspace tests and actual-source Windows API
 Clippy pass. Native runtime remains the next gate.
+
+## Native physical input smoke
+
+[Real Wayland keyboard events](evidence/windows/14ef60d-wayland-key-events.log)
+from xkbcli (trailing spaces trimmed) establish native14ef60d delivery and cleanup: A down/up,
+Ctrl+Shift+V with the correct modifiers and all releases, Shift+1 as `!`, and
+Delete down/up. Shift+Escape was not forwarded and blocked the next B; after
+a new picture click, exactly one unmodified B pair arrived.
+
+[Native input screenshot](evidence/windows/14ef60d-native-input-smoke.png)
+and local video identify that runtime. Final04aab37 W04 still requires the
+full pointer, focus, Num Lock, and corrected batching/wheel checks.

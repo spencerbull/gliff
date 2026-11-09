@@ -281,3 +281,19 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
   two-tab routing across independent remote sessions. Test-only SSH SetEnv
   selector can choose between two explicitly allowlisted fixture instances;
   preserve real user session and existing good pinned test alias.
+
+- Native14ef60d input smoke PASSED against xkbcli interactive-wayland in the
+  first isolated compositor: A down/up; Ctrl+Shift+V exact key/modifier sequence;
+  Shift+1 produces exclam; Delete down/up; Shift+Escape stays local and prevents
+  followingB from reaching remote; recapture thenB arrives with no modifiers.
+  Raw Wayland events and screenshot committed, rawvideo retainedlocally.
+  This does not close final W04 for04aab37 or all drag/focus/numlock/wheel cases.
+- Current Windows Gliff14ef60d PID2792/HWND2556628, one connected mirror tab,
+  focused/captured. Recorder disabled. Scale150%,1920x1080. Test state reset
+  only after backing up all8 owned saved tabs toshared/acceptance/eight-tabs-before-input.json.
+- First compositor has terminal1702603 and xkbcli observer1944710 (exec88073),
+  both workspace2 onGLIFF-VALIDATION, tiledleft/right. ObserverPIDfile and
+  rawlog under/tmp/gliff-windows-infra/server/. Keep both for final input proof.
+- Source04aab37 pushed and linked after327-test fullcheck; nativeCI pending.
+  Next worker may create only a second independent fixture under server-second/;
+  parent remains sole Windows/controller and owns testsshd/relay integration.
