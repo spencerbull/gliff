@@ -145,3 +145,37 @@ uses one ordered native key/pointer queue, checks the picture's actual egui
 layer, and maps E0/45 to Num Lock. Each regression rejects an explicit defect
 mutation. Full Linux checks pass325 tests, and the actual Win32 adapter passes
 a Windows-target dependency/API Clippy check. Native build/runtime are pending.
+
+## Native Windows error matrix
+
+- [Unknown host key](evidence/windows/a097f81-error-unknown-host.png): strict
+  refusal, no prompt or retry loop.
+- [Changed host key](evidence/windows/a097f81-error-changed-host.png): explicit
+  changed-key warning and refusal; [process check](evidence/windows/changed-host-processes.json)
+  found no SSH child afterward. The good pinned alias was untouched.
+- [Missing remote executable](evidence/windows/a097f81-error-missing-server.png):
+  the isolated SSH fixture actually exec'd an absent path. The GUI shows the
+  shell error and installation/remote-PATH guidance.
+- [SSH unavailable](evidence/windows/a097f81-error-missing-ssh.png): Cua launched
+  a test-only CMD entry point with PATH changed only for that process. Gliff
+  reported program-not-found and OpenSSH/PATH guidance. The
+  [readback](evidence/windows/missing-ssh-processes.json) confirms the system SSH
+  file stayed present and no SSH process ran. No Windows system files changed.
+- [Incompatible protocol](evidence/windows/14ef60d-error-incompatible-protocol.png):
+  a controlled SSH fixture emitted a valid HelloAck with version99, generated
+  and round-tripped by the real protocol crate. The native client refused it
+  with client/server versions and update guidance. The
+  [process check](evidence/windows/incompatible-processes.json) found no SSH child.
+
+The first four used a097f81 (SSH code unchanged); incompatibility used the
+[successful14ef60d native CI artifact](evidence/windows/14ef60d-ci.json). The
+full saved eight-tab state also allowed that CLI host to connect, exercising
+the startup-slot fix. W08 still needs final interrupted-link/teardown checks.
+
+The ordered-input follow-up review found horizontal wheel sign and loss of
+batched initial button edges. Parent verified winit's horizontal sign inversion
+and the candidate-reset reproduction. Axis-specific signs and deferred
+picture-ownership resolution now preserve both axes and consecutive initial
+clicks, while excluding preceding local-control input. Both defect mutations
+fail their regressions; all327 workspace tests and actual-source Windows API
+Clippy pass. Native runtime remains the next gate.

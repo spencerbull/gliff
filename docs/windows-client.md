@@ -104,11 +104,14 @@ from the server keymap; repeated local downs are ignored. With capture off,
 local GUI text entry and shortcuts retain their usual egui behavior. The
 non-Windows frontend retains its existing egui input path.
 
-An own-window pointer-down marks a provisional capture boundary and samples
+The first unresolved own-window pointer-down marks a provisional capture boundary and samples
 only already-held left/right modifiers using this thread's `GetKeyState`.
-If egui accepts that click on the picture's own layer, queued events after the click
-are retained; earlier local typing is excluded. Local-control clicks discard
+When egui resolves ownership, the consecutive run of picture-owned clicks
+is retained, including batched initial double-clicks and button chords. Events
+before a local-control click are excluded; only modifiers already held at the
+accepted picture boundary are synchronized. Local-control clicks discard
 provisional events; popup layers never activate the remote picture underneath.
+Wheel direction follows Windows' axis conventions (horizontal and vertical signs differ).
 Physical client pixels convert once to egui points using the current DPI before
 aspect-fit/remote-scale mapping. Capture leases have epochs: focus loss (including loss and
 regain within one frame), tab/connection changes, Shift+Escape or queue overflow

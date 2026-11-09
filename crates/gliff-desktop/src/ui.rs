@@ -434,7 +434,11 @@ impl eframe::App for Desktop {
             if activate_capture {
                 #[cfg(windows)]
                 {
-                    tab.native_capture = self.keyboard.capture();
+                    let dpi = ctx.pixels_per_point();
+                    tab.native_capture = self.keyboard.capture(|position| {
+                        let point = egui::pos2(position[0] as f32 / dpi, position[1] as f32 / dpi);
+                        picture_owns_press(ctx, response.layer_id, rect, point)
+                    });
                     tab.captured = tab.native_capture.is_some();
                 }
                 #[cfg(not(windows))]

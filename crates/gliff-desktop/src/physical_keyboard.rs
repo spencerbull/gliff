@@ -125,15 +125,16 @@ pub fn messages(
                 if !rect.contains(point) || delta == 0 {
                     continue;
                 }
-                let steps = f64::from(delta) / 120.0;
+                // Win32 horizontal wheel is opposite winit/egui's sign.
+                let steps = f64::from(delta) / 120.0 * if horizontal { 1.0 } else { -1.0 };
                 out.push(ClientMsg::PointerAxis {
                     axis: if horizontal {
                         Axis::Horizontal
                     } else {
                         Axis::Vertical
                     },
-                    value: -steps * 15.0,
-                    discrete: Some(-steps.round() as i32),
+                    value: steps * 15.0,
+                    discrete: Some(steps.round() as i32),
                     stop: false,
                 });
             }
@@ -202,7 +203,7 @@ impl Keyboard {
     /// Only modifier state is sampled; pre-click ordinary typing is never retained.
     pub fn pointer_down(&self, held_modifiers: &[u32]) {
         let mut state = self.0.lock().unwrap();
-        if state.phase == Phase::Active {
+        if state.phase != Phase::Off {
             return;
         }
         state.reset();
@@ -223,13 +224,65 @@ impl Keyboard {
         debug_assert!(!matches!(event, InputEvent::Key(_)));
         self.0.lock().unwrap().push(event);
     }
-    /// Accept only events following the most recent provisional click. Hook and
-    /// UI run on the same thread, so this promotion cannot interleave a message.
-    pub fn capture(&self) -> Option<Capture> {
+    // Keyboard-only state-machine probes do not need a GUI ownership predicate.
+    #[cfg(test)]
+    fn capture(&self) -> Option<Capture> {
         let mut state = self.0.lock().unwrap();
         if state.phase != Phase::Candidate {
             return None;
         }
+        state.phase = Phase::Active;
+        Some(Capture {
+            keyboard: self.clone(),
+            epoch: state.epoch,
+        })
+    }
+    /// Resolve provisional clicks against the picture's actual UI ownership.
+    /// Keep the complete consecutive run of picture clicks, after any local
+    /// click, and seed only modifiers already held at that boundary.
+    pub fn capture_picture(&self, owns: impl Fn([i32; 2]) -> bool) -> Option<Capture> {
+        let mut state = self.0.lock().unwrap();
+        if state.phase != Phase::Candidate {
+            return None;
+        }
+        let mut modifiers = BTreeSet::new();
+        let mut start = None;
+        let mut seed = BTreeSet::new();
+        for (index, event) in state.queue.iter().enumerate() {
+            match event {
+                InputEvent::Key(key) if MODIFIERS.contains(&key.code) => {
+                    if key.pressed {
+                        modifiers.insert(key.code);
+                    } else {
+                        modifiers.remove(&key.code);
+                    }
+                }
+                InputEvent::Button {
+                    position,
+                    pressed: true,
+                    ..
+                } => {
+                    if owns(*position) {
+                        if start.is_none() {
+                            start = Some(index);
+                            seed = modifiers.clone();
+                        }
+                    } else {
+                        start = None;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut events = state.queue.split_off(start?);
+        state.queue.clear();
+        for code in seed {
+            state.queue.push_back(InputEvent::Key(Transition {
+                code,
+                pressed: true,
+            }));
+        }
+        state.queue.append(&mut events);
         state.phase = Phase::Active;
         Some(Capture {
             keyboard: self.clone(),
@@ -315,6 +368,110 @@ mod tests {
             },
             Rect::from_min_size(pos2(10.0, 20.0), eframe::egui::vec2(600.0, 400.0)),
         )
+    }
+
+    #[test]
+    fn native_wheel_sign_matches_windows_axes_in_both_directions() {
+        let (geometry, rect) = scene();
+        for horizontal in [false, true] {
+            for delta in [-120, 120] {
+                let expected = f64::from(delta) / 120.0 * if horizontal { 1.0 } else { -1.0 };
+                let out = messages(
+                    &mut Held::default(),
+                    vec![InputEvent::Wheel {
+                        position: [310, 220],
+                        horizontal,
+                        delta,
+                    }],
+                    geometry,
+                    rect,
+                    1.0,
+                );
+                assert!(
+                    matches!(out.as_slice(), [ClientMsg::PointerAxis { value, discrete, .. }] if *value == expected * 15.0 && *discrete == Some(expected as i32))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn batched_initial_buttons_and_double_clicks_keep_every_edge() {
+        for buttons in [[272, 273], [272, 272]] {
+            let keyboard = Keyboard::default();
+            for code in buttons {
+                keyboard.pointer_down(&[29]);
+                keyboard.pointer(InputEvent::Button {
+                    position: [310, 220],
+                    code,
+                    pressed: true,
+                });
+                keyboard.pointer(InputEvent::Button {
+                    position: [310, 220],
+                    code,
+                    pressed: false,
+                });
+            }
+            let capture = keyboard.capture_picture(|_| true).unwrap();
+            let (geometry, rect) = scene();
+            let out = messages(
+                &mut Held::default(),
+                capture.drain().unwrap(),
+                geometry,
+                rect,
+                1.0,
+            );
+            let actual: Vec<_> = out
+                .iter()
+                .filter_map(|event| match event {
+                    ClientMsg::PointerButton { button, pressed } => Some((*button, *pressed)),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(
+                actual,
+                [
+                    (buttons[0], true),
+                    (buttons[0], false),
+                    (buttons[1], true),
+                    (buttons[1], false)
+                ]
+            );
+            assert!(matches!(
+                out.first(),
+                Some(ClientMsg::Key {
+                    keycode: 29,
+                    pressed: true
+                })
+            ));
+        }
+        let keyboard = Keyboard::default();
+        keyboard.pointer_down(&[]);
+        keyboard.pointer(InputEvent::Button {
+            position: [310, 220],
+            code: 272,
+            pressed: true,
+        });
+        keyboard.pointer_down(&[]);
+        keyboard.pointer(InputEvent::Button {
+            position: [310, 220],
+            code: 273,
+            pressed: true,
+        });
+        let capture = keyboard.capture_picture(|_| true).unwrap();
+        let (geometry, rect) = scene();
+        let out = messages(
+            &mut Held::default(),
+            capture.drain().unwrap(),
+            geometry,
+            rect,
+            1.0,
+        );
+        assert_eq!(
+            out.iter()
+                .filter(|event| matches!(event, ClientMsg::PointerButton { pressed: true, .. }))
+                .count(),
+            2
+        );
     }
 
     #[test]
@@ -600,15 +757,49 @@ mod tests {
         keyboard.discard_candidate(); // local text field was clicked
         assert!(keyboard.capture().is_none());
         keyboard.pointer_down(&[42]);
-        keyboard.key(30, true, false);
-        keyboard.pointer_down(&[97]); // newest click owns the provisional queue
+        keyboard.pointer(InputEvent::Button {
+            position: [0, 0],
+            code: 272,
+            pressed: true,
+        });
+        keyboard.key(30, true, false); // local GUI typing
+        keyboard.key(42, false, false);
+        keyboard.key(97, true, false);
+        keyboard.pointer_down(&[97]); // retained until ownership is resolved
+        keyboard.pointer(InputEvent::Button {
+            position: [310, 220],
+            code: 272,
+            pressed: true,
+        });
         keyboard.key(47, true, false);
-        let capture = keyboard.capture().unwrap();
+        let capture = keyboard.capture_picture(|p| p[0] > 10).unwrap();
         keyboard.discard_candidate(); // does not clear accepted capture
-        assert_eq!(
-            forward(&capture, &mut Held::default()).unwrap(),
-            [(97, true), (47, true)]
+        let (geometry, rect) = scene();
+        let out = messages(
+            &mut Held::default(),
+            capture.drain().unwrap(),
+            geometry,
+            rect,
+            1.0,
         );
+        assert!(matches!(
+            out.as_slice(),
+            [
+                ClientMsg::Key {
+                    keycode: 97,
+                    pressed: true
+                },
+                ClientMsg::PointerMotion { .. },
+                ClientMsg::PointerButton {
+                    button: 272,
+                    pressed: true
+                },
+                ClientMsg::Key {
+                    keycode: 47,
+                    pressed: true
+                },
+            ]
+        ));
         keyboard.pointer_down(&[]); // clicking again while active preserves order
         keyboard.key(47, false, false);
         assert_eq!(

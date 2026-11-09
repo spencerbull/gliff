@@ -253,3 +253,31 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
   Two isolated SSH failure aliases added to test user's config, backup in
   C:\GliffRuntime\validation\pre-error-ssh-config.txt. Valid alias/pinnedkey
   untouched. Error matrix and final native input remain next runtime steps.
+
+- Active reviewer `windows-ordered-input-review`, task suffix
+  416db4ac-c388-4ca0-886a-6b5ab52b007d, shared checkout read-only,
+  reviewing5004bf5..14ef60d; own /tmp artifacts only, cleanup parent.
+- CI5004bf5 passed both branch/PR; corrected14ef60d runs in progress.
+- W08 native unknown-host test on a097f81: immediate useful strict-host-key
+  error, no prompt, no ssh process left; screenshot captured. Changed-host test
+  is next. These SSH paths are unchanged by pending native input changes.
+
+- Reviewer416db4ac completed with2 P2s: horizontal wheel sign and initial
+  batched button/click loss. Verified winit0.30.13 source and actual-state probe.
+  Parent fixed axis-specific signs and resolves candidate runs only after
+  picture ownership is known, seeding modifiers and excluding prior local
+  input. Both mutations rejected. Full327-test checks and refreshed actual
+  Win32 API target Clippy pass. No more workers running.
+- W08 runtime unknown/changed keys, genuinely absent remote binary, missing
+  process PATH SSH and valid incompatible-v99 handshake all passed; no SSH
+  process remained. Screenshots/process evidence added. Interrupted-link and
+  final native teardown remain.14ef60d CI passed and artifacts downloaded,
+  checksums verified; exeSHA25699c8cefc945f0dfa43e18926358e934edd738000160779a69e6ab00a9bba63cb.
+- Current guest GUI14ef60d PID6024/HWND721772 shows protocol mismatch, no SSH
+  child. Recorder disabled. Scale150%,1920x1080. First fixture terminal moved
+  to workspace5 on monitor0 after its owned headless output closed. Before
+  remote input tests, move it back toGLIFF-VALIDATION workspace2.
+- Next initiative: a second isolated Hyprland/test endpoint is needed to prove
+  two-tab routing across independent remote sessions. Test-only SSH SetEnv
+  selector can choose between two explicitly allowlisted fixture instances;
+  preserve real user session and existing good pinned test alias.

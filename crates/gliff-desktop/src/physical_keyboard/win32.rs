@@ -58,8 +58,8 @@ impl NativeKeyboard {
         *self.target.lock().unwrap() = Some((thread::current().id(), window.hwnd.get()));
         Ok(())
     }
-    pub fn capture(&self) -> Option<Capture> {
-        self.input.capture()
+    pub fn capture(&self, owns: impl Fn([i32; 2]) -> bool) -> Option<Capture> {
+        self.input.capture_picture(owns)
     }
     pub fn disable(&self) {
         self.input.disable();
