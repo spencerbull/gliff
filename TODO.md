@@ -44,7 +44,7 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
 | Distribution | `packaging/windows/`, `scripts/windows/`, Windows CI | T3 child `windows-distribution-ci`, task suffix `347096b4-ff93-4711-a7e4-a7ca367d0062`; worktree `t3-1342a5d8-4b939796137f936f`, branch `t3/windows-distribution-ci` | Worker commit 1eeca65 inspected and integrated as a542881. Parent reran all 25 PowerShell fixture assertions, parsed 8 scripts, actionlint, 3 Microsoft winget schema validations and PNG dimension/CRC checks; PASS. Native Windows packaging not yet run. |
 | Runtime | Windows VM and real remote session evidence | Parent, local isolated Docker/KVM fallback | omaprox T3 link pending; tailnet denies root, sbull absent; local host has 105 GiB available RAM and 1.5 TiB disk |
 | Runtime readiness | Interactive Windows Cua Driver and SSH setup; no product/repo edits | T3 child `windows-runtime-readiness`, task suffix `283e391b-3bb0-481e-aa9b-1413216a0f8b`, shared checkout read-only; exclusive external `runtime-worker/` artifacts | Windows setup running; parent retains acceptance testing |
-| Review | Independent source and packaging review | Not started | After integration |
+| Review | Independent distribution review | T3 child `windows-packaging-review`, task suffix `fbe6c910-fcb9-4b9f-b020-d3c8daa45a5f`, shared checkout read-only | Reviewing integrated a542881; parent fixes verified findings. Desktop review follows final implementation. |
 
 ## Required gates and open questions
 
@@ -74,6 +74,18 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
   tabs and missing restored tabs on startup; sent verified findings to desktop
   worker before integration. egui does not expose Windows Super through
   `Modifiers.mac_cmd`; worker must implement or document that limitation.
+- Follow-up source inspection confirms explicit active/inactive clipboard
+  state, withdrawal and cancellation, saved tabs/selection restoration, and
+  meaningful real-codec/session tests are now implemented in the worker
+  checkout. Parent will rerun tests and inspect its final commit before accepting.
+- Windows bootstrap ran through a native TigerVNC window using host Cua Driver
+  in standard mode. No raw QMP input injection or host driver settings changed.
+  Guest CIM evidence confirms Windows 11 Enterprise Evaluation 64-bit,
+  10.0.26300, user GLIFF-WINTEST\\glifftest in interactive session 1. Live
+  automation readiness is still being verified by the runtime worker.
+- Requested explicit Linux workspace default members (GTK client, server,
+  probe) so `bin/build` does not build an unused second frontend for the Arch
+  package. Windows builds select gliff-desktop; checks still cover workspace.
 - Fork branch published through d35f895 after full Linux checks passed again.
   Initial HTTPS push lacked a credential helper; command-scoped authenticated
   `gh auth git-credential` helper worked without changing global Git settings.

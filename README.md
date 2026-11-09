@@ -81,6 +81,9 @@ See the [Windows specification and acceptance plan](docs/windows-plan.md) for
 the required checks. Windows support remains under validation until its real
 remote-session and installer evidence is recorded.
 
+Build, package, signing, and winget preparation instructions are in
+[Windows distribution](docs/windows-packaging.md).
+
 ## Use
 
 ```
