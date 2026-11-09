@@ -43,6 +43,7 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
 | Desktop | New `crates/gliff-desktop/` Rust frontend and protocol session | T3 child `windows-desktop-client`, task suffix `0fd12e91-70c6-4251-93c8-c078bd45e52d`; worktree `t3-22515915-fcdf078a1d1de8d9`, branch `t3/windows-rust-desktop-client` | Implementation started; parent integrates commits |
 | Distribution | `packaging/windows/`, `scripts/windows/`, Windows CI | T3 child `windows-distribution-ci`, task suffix `347096b4-ff93-4711-a7e4-a7ca367d0062`; worktree `t3-1342a5d8-4b939796137f936f`, branch `t3/windows-distribution-ci` | Implementation started; parent integrates commits |
 | Runtime | Windows VM and real remote session evidence | Parent, local isolated Docker/KVM fallback | omaprox T3 link pending; tailnet denies root, sbull absent; local host has 105 GiB available RAM and 1.5 TiB disk |
+| Runtime readiness | Interactive Windows Cua Driver and SSH setup; no product/repo edits | T3 child `windows-runtime-readiness`, task suffix `283e391b-3bb0-481e-aa9b-1413216a0f8b`, shared checkout read-only; exclusive external `runtime-worker/` artifacts | Windows setup running; parent retains acceptance testing |
 | Review | Independent source and packaging review | Not started | After integration |
 
 ## Required gates and open questions
@@ -64,6 +65,11 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
 - Mac support is future work; no Mac build is claimed by this change.
 - Git author identity was absent; set repository-local verified GitHub identity
   `Spencer Bull <7035687+spencerbull@users.noreply.github.com>` for commits.
+- Parent cross-checked shared protocol/transport (including test targets) for
+  `x86_64-pc-windows-msvc`. Found and fixed a Unix-only `unused_mut` warning in
+  spool directory construction. Windows-target Clippy with `-D warnings`,
+  rustfmt, and all 33 transport tests now pass. Logs in
+  `/tmp/gliff-windows-infra/{shared-windows-clippy,transport-tests}.log`.
 
 ## Runtime resources created by this loop
 

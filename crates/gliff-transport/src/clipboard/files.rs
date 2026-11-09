@@ -148,9 +148,13 @@ impl Spool {
         sweep_stale(base);
         // Pasted files can be private; the spool must not be readable by
         // other local users, whatever the umask.
-        let mut builder = std::fs::DirBuilder::new();
+        let builder = std::fs::DirBuilder::new();
         #[cfg(unix)]
-        std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+        let builder = {
+            let mut builder = builder;
+            std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+            builder
+        };
         let pid = std::process::id();
         for n in 0u32.. {
             let dir = base.join(format!("{pid}-{n}"));
