@@ -1,0 +1,2 @@
+# Required MSIX visual assets override the repository's screenshot PNG ignore.
+!Assets/*.png
