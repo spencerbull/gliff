@@ -124,3 +124,24 @@ requires150% DPI and pointer accuracy, and W06 still requires tab isolation.
 ![Headless remote at 982×552](evidence/windows/a097f81-headless-982x552.png)
 
 ![Headless remote after resize to 782×452](evidence/windows/a097f81-headless-782x452.png)
+
+## 150% DPI and pointer evidence
+
+The disposable VM's Settings was changed to1920×1080 and150% (1280×800
+only offered125%). The running headless client changed its output to1170×678
+at scale1.5. A Windows screenshot click at300,350 reached the remote logical
+position190,96, matching the displayed image after DPI conversion. A12-second
+independent compositor cursor trace sampled858 positions and caught that exact
+point; the remote terminal also logged its press/release.
+
+[Geometry and trace summary](evidence/windows/a097f81-dpi150.json) and
+[150% screenshot with remote input active](evidence/windows/a097f81-dpi150-pointer.png)
+record the evidence. The revised native pointer path still needs rerunning;
+this does not close W05 for the newest code.
+
+Independent native-input review at5004bf5 found cross-device ordering, popup
+ownership and missing Num Lock. The parent verified the findings and now
+uses one ordered native key/pointer queue, checks the picture's actual egui
+layer, and maps E0/45 to Num Lock. Each regression rejects an explicit defect
+mutation. Full Linux checks pass325 tests, and the actual Win32 adapter passes
+a Windows-target dependency/API Clippy check. Native build/runtime are pending.

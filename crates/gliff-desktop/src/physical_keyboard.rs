@@ -1,4 +1,7 @@
-//! Bounded physical keyboard capture. No platform APIs or shortcut reconstruction.
+//! Bounded, ordered window input. No platform APIs or shortcut reconstruction.
+use crate::{geometry::Geometry, input::Held};
+use eframe::egui::{pos2, Rect};
+use gliff_proto::{Axis, ClientMsg};
 use std::{
     collections::{BTreeSet, VecDeque},
     sync::{Arc, Mutex},
@@ -19,6 +22,7 @@ pub fn evdev(scan: u8, extended: bool) -> Option<u32> {
         0x35 => 98,  // keypad slash
         0x37 => 99,  // Print Screen
         0x38 => 100, // right Alt
+        0x45 => 69,  // Num Lock (Pause/E1 is rejected at the Win32 boundary)
         0x47 => 102,
         0x48 => 103,
         0x49 => 104,
@@ -58,6 +62,86 @@ pub struct Transition {
     pub pressed: bool,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InputEvent {
+    Key(Transition),
+    Motion([i32; 2]),
+    Button {
+        position: [i32; 2],
+        code: u32,
+        pressed: bool,
+    },
+    Wheel {
+        position: [i32; 2],
+        horizontal: bool,
+        delta: i16,
+    },
+}
+
+/// One queue preserves ordering across keys, clicks, motion and wheel. Native
+/// positions are physical client pixels; convert once to egui points here.
+pub fn messages(
+    held: &mut Held,
+    events: Vec<InputEvent>,
+    geometry: Geometry,
+    rect: Rect,
+    dpi: f32,
+) -> Vec<ClientMsg> {
+    let mut out = Vec::new();
+    for event in events {
+        match event {
+            InputEvent::Key(key) => out.extend(held.key(key.code, key.pressed)),
+            InputEvent::Motion(position) => {
+                let point = pos2(position[0] as f32 / dpi, position[1] as f32 / dpi);
+                let point = if held.buttons_down() {
+                    rect.clamp(point)
+                } else {
+                    point
+                };
+                if let Some([x, y]) = geometry.remote(rect, point) {
+                    out.push(ClientMsg::PointerMotion { x, y });
+                }
+            }
+            InputEvent::Button {
+                position,
+                code,
+                pressed,
+            } => {
+                let point = pos2(position[0] as f32 / dpi, position[1] as f32 / dpi);
+                if pressed && !rect.contains(point) {
+                    continue;
+                }
+                if let Some([x, y]) = geometry.remote(rect, rect.clamp(point)) {
+                    out.push(ClientMsg::PointerMotion { x, y });
+                }
+                out.extend(held.button(code, pressed));
+            }
+            InputEvent::Wheel {
+                position,
+                horizontal,
+                delta,
+            } => {
+                let point = pos2(position[0] as f32 / dpi, position[1] as f32 / dpi);
+                if !rect.contains(point) || delta == 0 {
+                    continue;
+                }
+                let steps = f64::from(delta) / 120.0;
+                out.push(ClientMsg::PointerAxis {
+                    axis: if horizontal {
+                        Axis::Horizontal
+                    } else {
+                        Axis::Vertical
+                    },
+                    value: -steps * 15.0,
+                    discrete: Some(-steps.round() as i32),
+                    stop: false,
+                });
+            }
+        }
+    }
+    out
+}
+
 #[derive(Default, PartialEq, Eq)]
 enum Phase {
     #[default]
@@ -70,7 +154,7 @@ enum Phase {
 struct State {
     epoch: u64,
     phase: Phase,
-    queue: VecDeque<Transition>,
+    queue: VecDeque<InputEvent>,
     down: BTreeSet<u32>,
 }
 impl State {
@@ -95,13 +179,18 @@ impl State {
             self.down.remove(&code)
         };
         if changed {
-            if self.queue.len() == CAPACITY {
-                // Losing a release is unsafe. Invalidate the entire capture lease;
-                // its owner must release remote input before accepting a new click.
-                self.reset();
-            } else {
-                self.queue.push_back(Transition { code, pressed });
-            }
+            self.push(InputEvent::Key(Transition { code, pressed }));
+        }
+    }
+    fn push(&mut self, event: InputEvent) {
+        if self.phase == Phase::Off {
+            return;
+        }
+        if self.queue.len() == CAPACITY {
+            // Losing any release is unsafe: invalidate the capture lease.
+            self.reset();
+        } else {
+            self.queue.push_back(event);
         }
     }
 }
@@ -129,6 +218,10 @@ impl Keyboard {
     }
     pub fn key(&self, code: u32, pressed: bool, repeat: bool) {
         self.0.lock().unwrap().key(code, pressed, repeat);
+    }
+    pub fn pointer(&self, event: InputEvent) {
+        debug_assert!(!matches!(event, InputEvent::Key(_)));
+        self.0.lock().unwrap().push(event);
     }
     /// Accept only events following the most recent provisional click. Hook and
     /// UI run on the same thread, so this promotion cannot interleave a message.
@@ -162,7 +255,7 @@ pub struct Capture {
 }
 impl Capture {
     /// None means fail closed: the caller must release all remote keys/buttons.
-    pub fn drain(&self) -> Option<Vec<Transition>> {
+    pub fn drain(&self) -> Option<Vec<InputEvent>> {
         let mut state = self.keyboard.0.lock().unwrap();
         (state.epoch == self.epoch && state.phase == Phase::Active)
             .then(|| state.queue.drain(..).collect())
@@ -195,7 +288,10 @@ mod tests {
             capture
                 .drain()?
                 .into_iter()
-                .flat_map(|key| held.key(key.code, key.pressed))
+                .flat_map(|event| match event {
+                    InputEvent::Key(key) => held.key(key.code, key.pressed),
+                    _ => panic!("unexpected pointer in keyboard-only probe"),
+                })
                 .map(|msg| match msg {
                     ClientMsg::Key { keycode, pressed } => (keycode, pressed),
                     _ => unreachable!(),
@@ -208,6 +304,153 @@ mod tests {
         keyboard.pointer_down(modifiers);
         let capture = keyboard.capture().unwrap();
         (keyboard, capture, Held::default())
+    }
+
+    fn scene() -> (Geometry, Rect) {
+        (
+            Geometry {
+                stream: [600, 400],
+                view: [600, 400],
+                scale_milli: 1000,
+            },
+            Rect::from_min_size(pos2(10.0, 20.0), eframe::egui::vec2(600.0, 400.0)),
+        )
+    }
+
+    #[test]
+    fn ctrl_click_and_release_keep_cross_device_order_within_one_frame() {
+        let (keyboard, capture, mut held) = active(&[]);
+        keyboard.key(29, true, false);
+        keyboard.pointer(InputEvent::Button {
+            position: [310, 220],
+            code: 272,
+            pressed: true,
+        });
+        keyboard.key(29, false, false);
+        keyboard.pointer(InputEvent::Button {
+            position: [310, 220],
+            code: 272,
+            pressed: false,
+        });
+        let (geometry, rect) = scene();
+        let out = messages(&mut held, capture.drain().unwrap(), geometry, rect, 1.0);
+        assert!(matches!(
+            out.as_slice(),
+            [
+                ClientMsg::Key {
+                    keycode: 29,
+                    pressed: true
+                },
+                ClientMsg::PointerMotion { x: 300.0, y: 200.0 },
+                ClientMsg::PointerButton {
+                    button: 272,
+                    pressed: true
+                },
+                ClientMsg::Key {
+                    keycode: 29,
+                    pressed: false
+                },
+                ClientMsg::PointerMotion { x: 300.0, y: 200.0 },
+                ClientMsg::PointerButton {
+                    button: 272,
+                    pressed: false
+                },
+            ]
+        ));
+        assert!(held.release().is_empty());
+    }
+
+    #[test]
+    fn initial_click_precedes_same_frame_typing_at_either_dpi() {
+        for dpi in [1.0, 1.5] {
+            let keyboard = Keyboard::default();
+            keyboard.pointer_down(&[]);
+            let position = [(310.0 * dpi) as i32, (220.0 * dpi) as i32];
+            keyboard.pointer(InputEvent::Button {
+                position,
+                code: 272,
+                pressed: true,
+            });
+            keyboard.pointer(InputEvent::Button {
+                position,
+                code: 272,
+                pressed: false,
+            });
+            keyboard.key(30, true, false);
+            keyboard.key(30, false, false);
+            let capture = keyboard.capture().unwrap();
+            let (geometry, rect) = scene();
+            let out = messages(
+                &mut Held::default(),
+                capture.drain().unwrap(),
+                geometry,
+                rect,
+                dpi,
+            );
+            assert!(matches!(
+                out.as_slice(),
+                [
+                    ClientMsg::PointerMotion { x: 300.0, y: 200.0 },
+                    ClientMsg::PointerButton { pressed: true, .. },
+                    ClientMsg::PointerMotion { x: 300.0, y: 200.0 },
+                    ClientMsg::PointerButton { pressed: false, .. },
+                    ClientMsg::Key {
+                        keycode: 30,
+                        pressed: true
+                    },
+                    ClientMsg::Key {
+                        keycode: 30,
+                        pressed: false
+                    },
+                ]
+            ));
+        }
+    }
+
+    #[test]
+    fn drag_clamps_at_event_time_and_wheel_keeps_its_position_and_order() {
+        let (keyboard, capture, mut held) = active(&[]);
+        keyboard.pointer(InputEvent::Button {
+            position: [310, 220],
+            code: 272,
+            pressed: true,
+        });
+        keyboard.pointer(InputEvent::Motion([-20, -20]));
+        keyboard.pointer(InputEvent::Button {
+            position: [-20, -20],
+            code: 272,
+            pressed: false,
+        });
+        keyboard.pointer(InputEvent::Motion([-20, -20])); // bars do not become coordinates
+        keyboard.pointer(InputEvent::Wheel {
+            position: [310, 220],
+            horizontal: false,
+            delta: 120,
+        });
+        keyboard.pointer(InputEvent::Wheel {
+            position: [0, 0],
+            horizontal: true,
+            delta: -120,
+        });
+        let (geometry, rect) = scene();
+        let out = messages(&mut held, capture.drain().unwrap(), geometry, rect, 1.0);
+        assert!(matches!(
+            out.as_slice(),
+            [
+                ClientMsg::PointerMotion { x: 300.0, y: 200.0 },
+                ClientMsg::PointerButton { pressed: true, .. },
+                ClientMsg::PointerMotion { x: 0.0, y: 0.0 },
+                ClientMsg::PointerMotion { x: 0.0, y: 0.0 },
+                ClientMsg::PointerButton { pressed: false, .. },
+                ClientMsg::PointerAxis {
+                    axis: Axis::Vertical,
+                    value: -15.0,
+                    discrete: Some(-1),
+                    ..
+                },
+            ]
+        ));
+        assert!(held.release().is_empty());
     }
 
     #[test]
@@ -317,6 +560,7 @@ mod tests {
             (0x5c, true, 126),
             (0x5d, true, 127),
             (0x37, true, 99),
+            (0x45, true, 69),
             (0x3a, false, 58),
             (0x52, false, 82),
         ] {
@@ -369,10 +613,10 @@ mod tests {
         keyboard.key(47, false, false);
         assert_eq!(
             capture.drain().unwrap(),
-            [Transition {
+            [InputEvent::Key(Transition {
                 code: 47,
                 pressed: false
-            }]
+            })]
         );
     }
 

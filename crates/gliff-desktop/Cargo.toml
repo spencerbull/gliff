@@ -23,7 +23,7 @@ arboard = { version = "3.6", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 winit = { version = "0.30", default-features = false, features = ["rwh_06"] }
-windows-sys = { version = "0.59", features = ["Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse"] }
+windows-sys = { version = "0.59", features = ["Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_Graphics_Gdi"] }
 # eframe disables wgpu defaults and enables Metal, but not Direct3D.
 wgpu = { version = "24", default-features = false, features = ["dx12"] }
 

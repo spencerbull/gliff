@@ -183,6 +183,10 @@ impl Held {
             vec![]
         }
     }
+    #[cfg(any(windows, test))]
+    pub(crate) fn buttons_down(&self) -> bool {
+        !self.buttons.is_empty()
+    }
     pub fn modifiers(&mut self, modifiers: Modifiers) -> Vec<ClientMsg> {
         let added = (modifiers.ctrl && !self.last_modifiers.ctrl)
             || (modifiers.shift && !self.last_modifiers.shift)

@@ -82,11 +82,12 @@ prevent delivery; the remote server must also clean up its virtual input when
 the stream closes.
 
 On Windows, a winit message observer forwards keyboard transitions only from
-Gliff's own UI-thread/window `WM_KEYDOWN/UP` and `WM_SYSKEYDOWN/UP` messages. It
+Gliff's own UI-thread/window `WM_KEYDOWN/UP` and `WM_SYSKEYDOWN/UP` messages,
+alongside that window's mouse button, motion and wheel messages. It
 never installs a global keyboard hook, records other windows' input, or consumes
 OS messages. Set-1
 physical positions map to evdev, including right Ctrl/Alt/Shift, navigation,
-Caps Lock, numpad Enter/slash and Windows keys when the OS delivers them.
+Caps/Num Lock, numpad Enter/slash and Windows keys when the OS delivers them.
 VK-only synthetic messages use `MapVirtualKeyW` as a best-effort fallback;
 without physical scan information they cannot distinguish every position.
 E1/Pause and unrecognized scan codes are unsupported. Other layouts, IMEs and
@@ -94,19 +95,22 @@ compose/dead-key input are unsupported; the remote keymap remains US QWERTY.
 OS-reserved shortcuts such as Ctrl+Alt+Del and many Windows-key combinations
 remain local. This adapter does not promise global interception or full parity.
 
-A bounded 256-transition queue preserves event-time order even when egui turns
+One bounded 256-event queue preserves key/pointer ordering, including Ctrl+click
+and click-then-type within one frame, even when egui turns
 Ctrl+V/C/X or Insert shortcuts into clipboard events. While captured, the UI
-ignores egui keyboard/clipboard events and generic modifier synthesis; physical
-transitions alone feed the existing held-input lifecycle. Remote repeat comes
+ignores egui key/pointer/clipboard forwarding and generic modifier synthesis;
+the ordered native events alone feed the existing held-input lifecycle. Remote repeat comes
 from the server keymap; repeated local downs are ignored. With capture off,
 local GUI text entry and shortcuts retain their usual egui behavior. The
 non-Windows frontend retains its existing egui input path.
 
 An own-window pointer-down marks a provisional capture boundary and samples
 only already-held left/right modifiers using this thread's `GetKeyState`.
-If egui accepts that click on the picture, queued transitions after the click
+If egui accepts that click on the picture's own layer, queued events after the click
 are retained; earlier local typing is excluded. Local-control clicks discard
-provisional events. Capture leases have epochs: focus loss (including loss and
+provisional events; popup layers never activate the remote picture underneath.
+Physical client pixels convert once to egui points using the current DPI before
+aspect-fit/remote-scale mapping. Capture leases have epochs: focus loss (including loss and
 regain within one frame), tab/connection changes, Shift+Escape or queue overflow
 invalidate the lease, discard pending transitions and release remote keys and
 buttons. Overflow requires another picture click. Dropping a stale lease cannot
@@ -115,8 +119,8 @@ thread, so accepting a boundary and draining its queue cannot race message
 insertion. This behavior still needs native Windows runtime verification.
 
 The picture is aspect fitted with letterboxing. Pointer mapping uses the
-displayed frame's geometry and the server's stream scale; local DPI enters
-only through headless physical resize requests. A clipped software cursor
+displayed frame's geometry and the server's stream scale; local DPI converts
+native physical coordinates and sizes headless physical resize requests. A clipped software cursor
 uses the remote cursor position and shape. Real DPI/cursor behavior remains
 a Windows runtime acceptance item.
 

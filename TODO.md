@@ -230,3 +230,26 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
   Orphan test outputs gliff-1862519 and gliff-1865423 from deliberate SIGTERM
   remain owned by loop and need cleanup. No recorder active. Test MSIX/CER
   already removed. Windows no-clipboard sentinels were temporary test text.
+
+- Active independent reviewer `windows-native-input-and-resize-review`, task
+  suffix6ca66c49-35c9-44e7-bff1-c78b4fa2c339, shared checkout read-only,
+  reviewingccbd9fc..5004bf5 (keyboard, event ordering, startup cap, IPC fallback).
+  Own /tmp review artifacts only; no VM access/build mutations; cleanup parent.
+
+- Reviewer6ca66c49 completed: three confirmed P2s (key/pointer ordering, popup
+  click leaking through image, E0/45 Num Lock). Parent fixed directly with
+  a single bounded native input queue, event-time position/DPI translation,
+  egui layer ownership and Num Lock mapping. All three defect mutations are
+  rejected by regressions. Full325-test scripts/check.sh and focused Clippy pass;
+  Windows-target API check of actual adapter source passes. Native CI/runtime
+  and follow-up independent review still required.
+- Actual150% DPI (Settings at1920x1080) changed remote headless output to
+  1170x678,scale1.5. Click300,350 screenshotpixels maps tological190,96;
+  independent858-sample cursor trace and terminal button events agree.
+  Screenshots/JSON added; rawvideo retainedlocally. New native pointer path
+  must repeatthis acceptance before W05 closes.
+- Current guest scale150%, resolution1920x1080. Settings is minimized;
+  Gliffa097f81 PID7676/HWND525104 remains focused/captured. Recorder is disabled.
+  Two isolated SSH failure aliases added to test user's config, backup in
+  C:\GliffRuntime\validation\pre-error-ssh-config.txt. Valid alias/pinnedkey
+  untouched. Error matrix and final native input remain next runtime steps.

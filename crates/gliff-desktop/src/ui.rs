@@ -1,19 +1,21 @@
 //! eframe/egui window adapter; no SSH, decode, or native clipboard I/O here.
 #[cfg(not(windows))]
-use crate::input::keycode;
+use crate::input::{button_code, keycode};
 #[cfg(windows)]
 use crate::physical_keyboard::{win32::NativeKeyboard, Capture};
 use crate::{
     clipboard::NativeClipboard,
     config::{Options, Saved},
     geometry::Geometry,
-    input::{button_code, Held},
+    input::Held,
     session::{Command, Session, MAX_TABS},
 };
-use eframe::egui::{
-    self, Color32, Event, Key, MouseWheelUnit, Rect, Sense, TextureHandle, TextureOptions,
-};
-use gliff_proto::{Axis, ClientMsg};
+#[cfg(not(windows))]
+use eframe::egui::MouseWheelUnit;
+use eframe::egui::{self, Color32, Event, Key, Rect, Sense, TextureHandle, TextureOptions};
+#[cfg(not(windows))]
+use gliff_proto::Axis;
+use gliff_proto::ClientMsg;
 use std::time::{Duration, Instant};
 
 struct Tab {
@@ -415,10 +417,15 @@ impl eframe::App for Desktop {
                 // position. Moving onto the picture after a local click must
                 // never promote local GUI typing into remote keyboard input.
                 let click = ctx.input(|i| capture_click(&i.events));
-                if tab.captured && click.is_some_and(|pos| !rect.contains(pos)) {
+                if tab.captured
+                    && click
+                        .is_some_and(|pos| !picture_owns_press(ctx, response.layer_id, rect, pos))
+                {
                     tab.release();
                 }
-                !tab.captured && click.is_some_and(|pos| rect.contains(pos))
+                !tab.captured
+                    && click
+                        .is_some_and(|pos| picture_owns_press(ctx, response.layer_id, rect, pos))
             };
             #[cfg(not(windows))]
             let activate_capture = response.hovered()
@@ -443,10 +450,13 @@ impl eframe::App for Desktop {
             #[cfg(windows)]
             if tab.captured {
                 if let Some(transitions) = tab.native_capture.as_ref().and_then(Capture::drain) {
-                    let messages = transitions
-                        .into_iter()
-                        .flat_map(|transition| tab.held.key(transition.code, transition.pressed))
-                        .collect();
+                    let messages = crate::physical_keyboard::messages(
+                        &mut tab.held,
+                        transitions,
+                        geometry,
+                        rect,
+                        ctx.pixels_per_point(),
+                    );
                     tab.input(messages);
                 } else {
                     // Focus loss, overflow, or event-time Shift+Escape invalidated
@@ -500,6 +510,7 @@ impl eframe::App for Desktop {
                             };
                             tab.held.shortcut(kind, ctx.input(|i| i.modifiers));
                         }
+                        #[cfg(not(windows))]
                         Event::PointerMoved(pos) => {
                             // Clamp drag coordinates to the image edge; bars never
                             // become remote desktop coordinates.
@@ -512,6 +523,7 @@ impl eframe::App for Desktop {
                                 tab.input(vec![ClientMsg::PointerMotion { x, y }]);
                             }
                         }
+                        #[cfg(not(windows))]
                         Event::PointerButton {
                             pos,
                             button,
@@ -528,6 +540,7 @@ impl eframe::App for Desktop {
                                 tab.input(messages);
                             }
                         }
+                        #[cfg(not(windows))]
                         Event::MouseWheel { unit, delta, .. } if response.hovered() => {
                             let factor = match unit {
                                 MouseWheelUnit::Point => 1.0,
@@ -638,6 +651,16 @@ impl eframe::App for Desktop {
     }
 }
 #[cfg(any(windows, test))]
+fn picture_owns_press(
+    ctx: &egui::Context,
+    layer: egui::LayerId,
+    rect: Rect,
+    pos: egui::Pos2,
+) -> bool {
+    rect.contains(pos) && ctx.layer_id_at(pos) == Some(layer)
+}
+
+#[cfg(any(windows, test))]
 fn capture_click(events: &[Event]) -> Option<egui::Pos2> {
     events.iter().rev().find_map(|event| match event {
         Event::PointerButton {
@@ -705,6 +728,86 @@ impl Drop for Desktop {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn recent_host_popup_over_picture_keeps_its_click_local() {
+        #[derive(Default)]
+        struct Popup {
+            combo: Option<Rect>,
+            target: Option<Rect>,
+            picture: Option<Rect>,
+            capture: bool,
+            selected: bool,
+        }
+        fn press(pos: egui::Pos2, pressed: bool) -> Event {
+            Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed,
+                modifiers: egui::Modifiers::NONE,
+            }
+        }
+        fn frame(ctx: &egui::Context, popup: &mut Popup, events: Vec<Event>) {
+            let raw = egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(900.0, 600.0),
+                )),
+                focused: true,
+                events,
+                ..Default::default()
+            };
+            let _ = ctx.run(raw, |ctx| {
+                egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
+                    let combo = egui::ComboBox::from_id_salt("recent")
+                        .selected_text("Recent hosts")
+                        .show_ui(ui, |ui| {
+                            for i in 0..16 {
+                                let row = ui.selectable_label(false, format!("host-{i}"));
+                                if i == 8 {
+                                    popup.target = Some(row.rect);
+                                    popup.selected |= row.clicked();
+                                }
+                            }
+                        });
+                    popup.combo = Some(combo.response.rect);
+                });
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    let rect = ui.available_rect_before_wrap();
+                    popup.picture = Some(rect);
+                    let response = ui.allocate_rect(rect, Sense::click());
+                    popup.capture = ctx
+                        .input(|i| capture_click(&i.events))
+                        .is_some_and(|pos| picture_owns_press(ctx, response.layer_id, rect, pos));
+                });
+            });
+        }
+        let ctx = egui::Context::default();
+        let mut popup = Popup::default();
+        frame(&ctx, &mut popup, vec![]);
+        let combo = popup.combo.unwrap().center();
+        frame(
+            &ctx,
+            &mut popup,
+            vec![Event::PointerMoved(combo), press(combo, true)],
+        );
+        frame(&ctx, &mut popup, vec![press(combo, false)]);
+        frame(&ctx, &mut popup, vec![]);
+        let target = popup.target.expect("popup is open").center();
+        assert!(popup.picture.unwrap().contains(target));
+        frame(
+            &ctx,
+            &mut popup,
+            vec![Event::PointerMoved(target), press(target, true)],
+        );
+        assert!(
+            !popup.capture,
+            "popup press must not acquire remote capture"
+        );
+        frame(&ctx, &mut popup, vec![press(target, false)]);
+        assert!(popup.selected, "the local popup selection must still work");
+        assert!(!popup.capture);
+    }
+
     #[test]
     fn cli_host_has_a_slot_when_saved_tabs_are_full() {
         let saved = Saved {
