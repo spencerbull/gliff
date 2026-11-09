@@ -105,3 +105,22 @@ Omarchy.
 Only the public test CER was trusted in the disposable VM, then removed. No
 private signing key was exported. No certificate or package remains installed
 from this fixture. Public trusted signing/submission gates are unchanged.
+
+## Headless resize on current Hyprland
+
+The existing installed server sent the legacy monitor command and received
+`unknown request`; its Lua fallback only recognized `non-legacy`. A new socket
+regression failed on the observed response before the guard was extended.
+The fix accepts that exact additional response, retains the successful legacy
+path and preserves genuine mode/scale errors. The test fixture now runs this
+branch's locally built server; the user's installed server is untouched.
+
+The same Windows a097f81 client automatically reconnected, resent its cached
+window size, and resized the new output to 982×552 at scale1. Changing the
+Windows frame from1000×700 to800×600 then resized the output to782×452. Both
+client screenshot and independent `hyprctl monitors` readback match. W05 still
+requires150% DPI and pointer accuracy, and W06 still requires tab isolation.
+
+![Headless remote at 982×552](evidence/windows/a097f81-headless-982x552.png)
+
+![Headless remote after resize to 782×452](evidence/windows/a097f81-headless-782x452.png)

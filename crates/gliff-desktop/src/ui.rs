@@ -102,7 +102,7 @@ impl Desktop {
             .map(|p| Saved::load(&p))
             .unwrap_or_default();
         let (tabs, selected) = if options.connect.is_none() {
-            restore_tabs(&saved)
+            restore_for_launch(&saved, options.host.as_deref())
         } else {
             (Vec::new(), 0)
         };
@@ -647,6 +647,21 @@ fn capture_click(events: &[Event]) -> Option<egui::Pos2> {
     })
 }
 
+// A CLI host must connect even when all eight saved slots are occupied.
+// Reuse its saved slot, or replace the selected disconnected slot at capacity.
+fn restore_for_launch(saved: &Saved, requested: Option<&str>) -> (Vec<Tab>, usize) {
+    let (mut tabs, selected) = restore_tabs(saved);
+    if let Some(host) = requested.filter(|host| crate::ssh::validate_host(host).is_ok()) {
+        if let Some(index) = tabs.iter().position(|tab| tab.host == host) {
+            tabs.remove(index);
+        } else if tabs.len() == MAX_TABS {
+            tabs.remove(selected);
+        }
+    }
+    let selected = selected.min(tabs.len().saturating_sub(1));
+    (tabs, selected)
+}
+
 fn restore_tabs(saved: &Saved) -> (Vec<Tab>, usize) {
     let tabs: Vec<_> = saved
         .tabs
@@ -690,6 +705,31 @@ impl Drop for Desktop {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cli_host_has_a_slot_when_saved_tabs_are_full() {
+        let saved = Saved {
+            tabs: (0..MAX_TABS).map(|i| format!("host-{i}")).collect(),
+            selected: 3,
+            ..Default::default()
+        };
+        let (mut tabs, selected) = restore_for_launch(&saved, Some("new-host"));
+        assert_eq!(tabs.len(), MAX_TABS - 1);
+        assert!(selected < tabs.len());
+        assert!(!tabs.iter().any(|tab| tab.host == "host-3"));
+        // The real add path can append the requested host without hitting its cap.
+        tabs.push(Tab::new("new-host".into()));
+        assert_eq!(tabs.len(), MAX_TABS);
+        let (tabs, _) = restore_for_launch(&saved, Some("host-5"));
+        assert_eq!(tabs.len(), MAX_TABS - 1);
+        assert!(!tabs.iter().any(|tab| tab.host == "host-5"));
+        assert!(tabs.iter().any(|tab| tab.host == "host-3"));
+        assert_eq!(restore_for_launch(&saved, None).0.len(), MAX_TABS);
+        assert_eq!(
+            restore_for_launch(&saved, Some("invalid host")).0.len(),
+            MAX_TABS
+        );
+    }
+
     #[test]
     fn capture_boundary_uses_last_press_position_before_motion_or_typing() {
         let toolbar = egui::pos2(20.0, 10.0);

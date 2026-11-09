@@ -18,7 +18,8 @@ branch list.
 Add a separate Rust desktop frontend in `crates/gliff-desktop` using
 eframe/egui/winit for Windows windowing and rendering. Reuse `gliff-proto`,
 `gliff-transport`, and `gliff-sw` directly. Keep protocol v1 and the remote
-Linux server unchanged. Isolate window/input/clipboard adapters from session
+Linux session architecture. A runtime-discovered IPC compatibility fix also
+accepts current Hyprland Lua rejection text for headless monitor mode changes. Isolate window/input/clipboard adapters from session
 logic so another frontend can reuse the latter. Preserve the existing Linux
 GTK frontend and its hardware acceleration. Windows initially decodes on the
 CPU; hardware decode is a later, measured optimization, not a prerequisite.

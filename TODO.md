@@ -210,3 +210,23 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
 - Worker native keyboard implementation completed4bd2dd1; parent review and
   native CI pending. Headless resize connects but does not change monitor mode;
   inspecting server/client evidence before attributing the failure.
+
+- Integrated keyboard worker4bd2dd1 as8c9bdfd; inspected queue, HWND/thread
+  boundary, Win32 unsafe comments and UI wiring. Full workspace checks passed
+  after integration and the following fixes:321 tests,1 ignored.
+- Verified headless resize root cause in installed server log: legacy monitor
+  IPC returns exact unknown request on current Hyprland. New socket regression
+  failed before fix; both Lua rejections and legacy success/error controls pass
+  afterward. Local branch server now used only for test fixture; installed
+  server untouched. Live Windows auto-reconnect resent dimensions; remote
+  resized982x552 then782x452, screenshots and independent monitor readback match.
+- CLI launch now reserves a slot by reusing requested saved host or replacing
+  the selected disconnected tab at eight-slot capacity. Prevents repeated CLI
+  launches accumulating duplicates until they silently fail to connect.
+- Remaining review concern: native key drain precedes egui pointer forwarding;
+  verify cross-device ordering for Ctrl+click and click-then-type in one frame.
+- Runtime current: Windows a097f81 headless client PID7676/HWND525104; server
+  PID1874289 (attempt3), output gliff-1874289, workspace5 holds fixture.
+  Orphan test outputs gliff-1862519 and gliff-1865423 from deliberate SIGTERM
+  remain owned by loop and need cleanup. No recorder active. Test MSIX/CER
+  already removed. Windows no-clipboard sentinels were temporary test text.
