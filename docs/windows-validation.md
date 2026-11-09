@@ -22,8 +22,8 @@ in [windows-plan.md](windows-plan.md); this report records actual evidence.
 
 | ID | Current result | Evidence and remaining work |
 | --- | --- | --- |
-| W01 | Partial | First native MSVC compile, Clippy and desktop tests passed. A shared file-transfer test exposed Windows separators; serializer fixed, full native rerun pending. |
-| W02 | Pending | Clean VM and GUI automation ready; portable artifact launch not yet exercised. |
+| W01 | Pass for cee0861 | Native MSVC build, Clippy, all portable tests, import/dependency checks and MakeAppx package validation passed; ZIP/MSIX/test-signed artifacts downloaded from PR run 42638509177 and checksums verified. |
+| W02 | Failed first GUI launch; fix under test | Clean VM `--version` passed with no development tools. GUI launch failed because eframe disables the Direct3D backend by default. Added an explicit Windows dx12 feature and native regression guard; new artifact/runtime retest required. |
 | W03 | Pending | SSH authentication works; real Gliff video and 60-second recording still required. |
 | W04 | Partial | Input/release/shortcut regressions pass; real Windows input flow pending. |
 | W05 | Partial | Geometry/DPI and reconnect epoch tests pass; real resize/cursor/DPI evidence pending. |
@@ -32,7 +32,16 @@ in [windows-plan.md](windows-plan.md); this report records actual evidence.
 | W08 | Partial | SSH quoting, protocol failures, deadlines and teardown tests pass; Windows runtime error/process checks pending. |
 | W09 | Pending | SDK MSIX generation and signed install/upgrade fixtures are in native CI; installation/alias/upgrade/uninstall not yet exercised. |
 | W10 | Partial | Branch and PR runs started; generator fixtures pass native WinGet semantic validation. Native distributions/checksums still required. |
-| W11 | Pass for this implementation | `scripts/check.sh` passed fmt, Clippy with warnings denied and all 305 Linux workspace tests. Independent reviews completed; verified findings fixed with regressions. |
+| W11 | Pass through cee0861 | `scripts/check.sh` passed fmt, Clippy with warnings denied and all 305 Linux workspace tests. Follow-up paste modifier fixes and renderer feature change require another check. |
+
+The cee0861 portable executable SHA-256 is
+`7cf58ecab9a420e48268bf164085c24bfee7a49db3d786b15243ccdb9c8a99a6`.
+Its failed GUI launch reported
+`Wgpu(CreateSurfaceError(...FailedToCreateSurfaceForAnyBackend({})))`.
+Inspection of the resolved Windows features confirmed that eframe enabled
+Metal/Vulkan but not Direct3D; the VM has no Vulkan driver. This is a client
+build configuration bug, not an SSH or remote capture failure. No successful
+remote-session evidence is claimed from this artifact.
 
 ## Native WinGet semantic validation
 

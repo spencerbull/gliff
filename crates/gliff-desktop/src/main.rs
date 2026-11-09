@@ -48,3 +48,12 @@ fn native_options() -> eframe::NativeOptions {
         ..Default::default()
     }
 }
+
+#[cfg(all(test, windows))]
+mod tests {
+    #[test]
+    fn windows_renderer_has_a_compiled_direct3d_backend() {
+        assert!(eframe::wgpu::Instance::enabled_backend_features()
+            .contains(eframe::wgpu::Backends::DX12));
+    }
+}

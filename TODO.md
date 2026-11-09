@@ -113,6 +113,22 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
   install/upgrade fixtures and public CER. No private key export or host trust
   changes; public release jobs cannot consume it. This supports clean-VM MSIX
   testing without installing an SDK. Native SDK/signing execution still pending.
+- cee0861 PR run 42638509177 produced all Windows artifacts. Parent downloaded
+  ZIP/MSIX/test-signed fixtures and verified every checksum. Native MSVC,
+  Clippy/tests, import checks and SDK structural validation passed. Clean guest
+  --version/hash probe passed with no Rust/VS/SDK installed.
+- First actual Windows GUI launch FAILED surface creation. Captured stderr
+  proved no requested backend initialized; cargo feature inspection showed
+  eframe disables Direct3D defaults. Added explicit Windows-only wgpu dx12
+  feature plus native compiled-backend guard; actual GUI retest pending.
+- Follow-up reviewer `windows-fixes-and-msix-review`, task suffix
+  `02c7c861-17f1-48c0-aa59-ce49421b8344`, found two remaining paste release-order
+  bugs and no new clipboard/epoch/MSIX fixture defects. Parent reproduced both
+  with new failing tests, retained full modifier chords through releases and
+  batched events; all six input tests now pass. Full checks/native rerun pending.
+- Native WinGet CLI validation passed for fixed fixture manifests, while the
+  identical Scope:user negative control returned nonzero with the expected
+  warning. Raw evidence is committed in docs/evidence/windows/.
 - Fork branch published through d35f895 after full Linux checks passed again.
   Initial HTTPS push lacked a credential helper; command-scoped authenticated
   `gh auth git-credential` helper worked without changing global Git settings.

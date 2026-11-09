@@ -100,6 +100,7 @@ pub struct Held {
     buttons: BTreeSet<u32>,
     shortcuts: Vec<(u8, Modifiers)>,
     paste_modifiers: Option<Modifiers>,
+    last_modifiers: Modifiers,
 }
 
 impl Held {
@@ -121,6 +122,12 @@ impl Held {
     /// egui replaces some physical presses with Copy/Cut/Paste events.
     /// Retain modifiers until the corresponding physical key-up arrives.
     pub fn shortcut(&mut self, kind: u8, modifiers: Modifiers) {
+        // Clipboard events carry no event-time modifiers. The UI's value can
+        // already reflect releases later in the same input batch.
+        let modifiers = self.paste_modifiers.unwrap_or(modifiers);
+        if !modifiers.ctrl && !modifiers.shift {
+            return;
+        }
         if self.shortcuts.len() < 8 {
             self.shortcuts.push((kind, modifiers));
         }
@@ -141,16 +148,16 @@ impl Held {
         });
         let modifiers = if let Some(index) = index {
             self.shortcuts.remove(index).1
-        } else if (current.ctrl && matches!(code, 45..=47 | 110))
-            || (current.shift && matches!(code, 110 | 111))
-        {
-            current
         } else if let Some(modifiers) = paste_modifiers
             .filter(|m| (m.ctrl && matches!(code, 47 | 110)) || (m.shift && code == 110))
         {
             // egui can consume Paste-down without emitting Paste when the
             // local clipboard is empty. Ctrl/Shift may already be released.
             modifiers
+        } else if (current.ctrl && matches!(code, 45..=47 | 110))
+            || (current.shift && matches!(code, 110 | 111))
+        {
+            current
         } else {
             return vec![];
         };
@@ -177,9 +184,14 @@ impl Held {
         }
     }
     pub fn modifiers(&mut self, modifiers: Modifiers) -> Vec<ClientMsg> {
-        if modifiers.ctrl || modifiers.shift {
+        let added = (modifiers.ctrl && !self.last_modifiers.ctrl)
+            || (modifiers.shift && !self.last_modifiers.shift)
+            || (modifiers.alt && !self.last_modifiers.alt)
+            || (modifiers.mac_cmd && !self.last_modifiers.mac_cmd);
+        if (modifiers.ctrl || modifiers.shift) && (added || self.paste_modifiers.is_none()) {
             self.paste_modifiers = Some(modifiers);
         }
+        self.last_modifiers = modifiers;
         [
             (42, modifiers.shift),
             (29, modifiers.ctrl),
@@ -204,6 +216,7 @@ impl Held {
     pub fn release(&mut self) -> Vec<ClientMsg> {
         self.shortcuts.clear();
         self.paste_modifiers = None;
+        self.last_modifiers = Modifiers::NONE;
         let keys = std::mem::take(&mut self.keys)
             .into_iter()
             .map(|keycode| ClientMsg::Key {
@@ -337,5 +350,80 @@ mod tests {
                 pressed: false,
             }]
         );
+    }
+
+    #[test]
+    fn paste_keeps_full_chord_through_either_modifier_release_order() {
+        let full = Modifiers {
+            ctrl: true,
+            shift: true,
+            ..Modifiers::NONE
+        };
+        for remaining in [Modifiers::CTRL, Modifiers::SHIFT] {
+            let mut held = Held::default();
+            held.modifiers(full);
+            held.modifiers(remaining);
+            held.modifiers(Modifiers::NONE);
+            let messages = held.key_up(47, Modifiers::NONE);
+            let down = messages
+                .iter()
+                .position(|m| {
+                    matches!(
+                        m,
+                        ClientMsg::Key {
+                            keycode: 47,
+                            pressed: true
+                        }
+                    )
+                })
+                .expect("paste key press");
+            for keycode in [29, 42] {
+                assert!(messages[..down].contains(&ClientMsg::Key {
+                    keycode,
+                    pressed: true
+                }));
+            }
+            assert!(held.release().is_empty());
+        }
+        let mut held = Held::default();
+        held.modifiers(full);
+        held.modifiers(Modifiers::CTRL);
+        let messages = held.key_up(47, Modifiers::CTRL);
+        assert!(messages.contains(&ClientMsg::Key {
+            keycode: 42,
+            pressed: true
+        }));
+        held.release();
+    }
+
+    #[test]
+    fn batched_paste_and_modifier_up_uses_the_chord_before_the_frame_ended() {
+        let mut held = Held::default();
+        held.modifiers(Modifiers::CTRL); // A preceding captured frame.
+        held.shortcut(2, Modifiers::NONE); // Paste then Ctrl-up were batched.
+        held.modifiers(Modifiers::NONE);
+        let messages = held.key_up(47, Modifiers::NONE);
+        assert_eq!(
+            messages,
+            vec![
+                ClientMsg::Key {
+                    keycode: 29,
+                    pressed: true
+                },
+                ClientMsg::Key {
+                    keycode: 47,
+                    pressed: true
+                },
+                ClientMsg::Key {
+                    keycode: 47,
+                    pressed: false
+                },
+                ClientMsg::Key {
+                    keycode: 29,
+                    pressed: false
+                },
+            ]
+        );
+        assert!(held.release().is_empty());
     }
 }

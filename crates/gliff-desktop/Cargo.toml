@@ -21,6 +21,10 @@ tokio.workspace = true
 eframe = { version = "0.31", default-features = false, features = ["default_fonts", "wgpu", "x11", "wayland"] }
 arboard = { version = "3.6", default-features = false }
 
+[target.'cfg(windows)'.dependencies]
+# eframe disables wgpu defaults and enables Metal, but not Direct3D.
+wgpu = { version = "24", default-features = false, features = ["dx12"] }
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
 tempfile = "3"
