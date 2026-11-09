@@ -1,6 +1,6 @@
 //! Window-independent session worker. Every queue and retained image is bounded.
 use crate::{
-    clipboard::{AbortTask, Bridge},
+    clipboard::{AbortTask, Bridge, RemoteText},
     config::Options,
     geometry::Geometry,
     input::Held,
@@ -12,7 +12,10 @@ use gliff_sw::{BgraFrame, Decoder};
 use gliff_transport::Framed;
 use std::{
     collections::VecDeque,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+    },
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tokio::{
@@ -44,6 +47,7 @@ pub struct Cursor {
 }
 #[derive(Default)]
 pub struct Snapshot {
+    pub connection_epoch: u64,
     pub status: String,
     pub connected: bool,
     pub headless: bool,
@@ -53,8 +57,25 @@ pub struct Snapshot {
     pub cursor_pos: Option<(f64, f64, u32, bool)>,
     pub clipboard: Option<String>,
     pub clipboard_active: bool,
+    pub clipboard_generation: Arc<AtomicU64>,
 }
 pub type Shared = Arc<Mutex<Snapshot>>;
+
+impl Snapshot {
+    fn receive_clipboard(&mut self, text: Option<RemoteText>) {
+        if self.clipboard_active {
+            match text {
+                Some(text)
+                    if text.generation == self.clipboard_generation.load(Ordering::SeqCst) =>
+                {
+                    self.clipboard = Some(text.text);
+                }
+                None => self.clipboard = None,
+                _ => {}
+            }
+        }
+    }
+}
 
 pub enum Command {
     Input(Vec<ClientMsg>),
@@ -95,6 +116,7 @@ impl Session {
                     }
                     {
                         let mut s = shared.lock().unwrap();
+                        s.connection_epoch = s.connection_epoch.wrapping_add(1);
                         s.status = format!("Connecting ({}/3)…", attempt + 1);
                         s.connected = false;
                         s.picture = None;
@@ -158,6 +180,9 @@ impl Session {
             let mut state = self.state.lock().unwrap();
             let changed = state.clipboard_active != active;
             state.clipboard_active = active;
+            if changed {
+                state.clipboard_generation.fetch_add(1, Ordering::SeqCst);
+            }
             if !active {
                 state.clipboard = None;
             }
@@ -169,6 +194,12 @@ impl Session {
         changed
     }
     pub fn send(&self, command: Command) {
+        if matches!(&command, Command::Text(_)) {
+            // Invalidate old results immediately, before the worker drains its queue.
+            let mut state = self.state.lock().unwrap();
+            state.clipboard_generation.fetch_add(1, Ordering::SeqCst);
+            state.clipboard = None;
+        }
         if matches!(
             self.commands.try_send(command),
             Err(mpsc::error::TrySendError::Full(_))
@@ -431,7 +462,13 @@ async fn protocol<W: AsyncWrite + Unpin>(
     let mut geometries = VecDeque::new();
     let (clip_out, mut clip_rx) = gliff_transport::clipboard::outbound_channel();
     let (clip_text, mut clip_text_rx) = watch::channel(None);
-    let mut clipboard = (!options.no_clipboard).then(|| Bridge::new(clip_out, clip_text));
+    let mut clipboard = (!options.no_clipboard).then(|| {
+        Bridge::with_generation(
+            clip_out,
+            clip_text,
+            state.lock().unwrap().clipboard_generation.clone(),
+        )
+    });
     if let Some(bridge) = clipboard.as_mut() {
         bridge.set_active(state.lock().unwrap().clipboard_active);
     }
@@ -487,7 +524,7 @@ async fn protocol<W: AsyncWrite + Unpin>(
             Ok(()) = clip_text_rx.changed(), if clipboard.is_some() => {
                 let text = clip_text_rx.borrow_and_update().clone();
                 let mut snapshot = state.lock().unwrap();
-                if snapshot.clipboard_active { snapshot.clipboard = text; }
+                snapshot.receive_clipboard(text);
             }
             _ = timer.tick() => {
                 if received_at.elapsed() > Duration::from_secs(20) { bail!("Server stopped responding"); }
@@ -567,6 +604,45 @@ fn now_ms() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64
+}
+
+#[cfg(test)]
+mod clipboard_tests {
+    use super::*;
+
+    #[test]
+    fn queued_local_copy_rejects_an_already_completed_old_remote_result() {
+        let state = Shared::default();
+        {
+            let mut snapshot = state.lock().unwrap();
+            snapshot.clipboard_active = true;
+            snapshot.clipboard = Some("old remote".into());
+        }
+        let (commands, mut pending) = mpsc::channel(64);
+        let (cancel, _cancelled) = watch::channel(false);
+        let session = Session {
+            state: state.clone(),
+            commands,
+            cancel,
+            thread: None,
+        };
+        session.send(Command::Text("new local".into()));
+        assert!(state.lock().unwrap().clipboard.is_none());
+        // The command has not reached Bridge::offer yet.
+        assert!(matches!(pending.try_recv(), Ok(Command::Text(text)) if text == "new local"));
+        let mut snapshot = state.lock().unwrap();
+        snapshot.receive_clipboard(Some(RemoteText {
+            generation: 0,
+            text: "late old remote".into(),
+        }));
+        assert!(snapshot.clipboard.is_none());
+        let generation = snapshot.clipboard_generation.load(Ordering::SeqCst);
+        snapshot.receive_clipboard(Some(RemoteText {
+            generation,
+            text: "fresh remote".into(),
+        }));
+        assert_eq!(snapshot.clipboard.as_deref(), Some("fresh remote"));
+    }
 }
 
 #[cfg(all(test, unix))]

@@ -18,6 +18,12 @@ use tokio::{sync::watch, task::JoinHandle};
 
 pub const TEXT_CAP: usize = 1024 * 1024;
 
+#[derive(Clone, Debug)]
+pub struct RemoteText {
+    pub generation: u64,
+    pub text: String,
+}
+
 pub struct AbortTask(pub JoinHandle<()>);
 impl Drop for AbortTask {
     fn drop(&mut self) {
@@ -43,12 +49,20 @@ pub struct Bridge {
     serial: u32,
     text: String,
     fetch: Option<AbortTask>,
-    received: watch::Sender<Option<String>>,
+    received: watch::Sender<Option<RemoteText>>,
+    generation: Arc<AtomicU64>,
 }
 impl Bridge {
     pub fn new(
         out: gliff_transport::clipboard::Outbound,
-        received: watch::Sender<Option<String>>,
+        received: watch::Sender<Option<RemoteText>>,
+    ) -> Self {
+        Self::with_generation(out, received, Arc::default())
+    }
+    pub fn with_generation(
+        out: gliff_transport::clipboard::Outbound,
+        received: watch::Sender<Option<RemoteText>>,
+        generation: Arc<AtomicU64>,
     ) -> Self {
         Self {
             engine: Transfers::new(out, Side::Client),
@@ -57,7 +71,13 @@ impl Bridge {
             text: String::new(),
             fetch: None,
             received,
+            generation,
         }
+    }
+    fn invalidate_fetch(&mut self) {
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        self.fetch = None;
+        self.received.send_replace(None);
     }
     /// Withdraw selection and cancel all transfer work when a tab loses ownership.
     pub fn set_active(&mut self, active: bool) -> Option<ClipboardMsg> {
@@ -66,9 +86,8 @@ impl Bridge {
         }
         self.active = active;
         self.engine.abort_serving();
-        self.fetch = None;
+        self.invalidate_fetch();
         self.text.clear();
-        self.received.send_replace(None);
         self.serial = self.serial.wrapping_add(1);
         (!active).then(|| ClipboardMsg::Offer {
             serial: self.serial,
@@ -80,6 +99,7 @@ impl Bridge {
         if !self.active || text.len() > TEXT_CAP {
             return None;
         }
+        self.invalidate_fetch();
         self.engine.abort_serving();
         self.text = text;
         self.serial = self.serial.wrapping_add(1);
@@ -121,7 +141,7 @@ impl Bridge {
             serial, mime_types, ..
         }) = self.engine.on_msg(msg, bytes)
         {
-            self.fetch = None;
+            self.invalidate_fetch();
             if let Some(mime) = TEXT_MIMES
                 .iter()
                 .find(|mime| mime_types.iter().any(|m| m == **mime))
@@ -129,6 +149,8 @@ impl Bridge {
                 let engine = self.engine.clone();
                 let received = self.received.clone();
                 let mime = mime.to_string();
+                let generation = self.generation.clone();
+                let started = generation.load(Ordering::SeqCst);
                 self.fetch = Some(AbortTask(tokio::task::spawn_local(async move {
                     let data = Rc::new(RefCell::new(Vec::new()));
                     if engine
@@ -143,7 +165,12 @@ impl Bridge {
                     {
                         if let Ok(text) = String::from_utf8(std::mem::take(&mut *data.borrow_mut()))
                         {
-                            received.send_replace(Some(text));
+                            if generation.load(Ordering::SeqCst) == started {
+                                received.send_replace(Some(RemoteText {
+                                    generation: started,
+                                    text,
+                                }));
+                            }
                         }
                     }
                 })));
@@ -245,6 +272,69 @@ impl Drop for NativeClipboard {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn newer_local_selection_cancels_and_invalidates_remote_fetch() {
+        tokio::task::LocalSet::new()
+            .run_until(async {
+                let (out, mut messages) = gliff_transport::clipboard::outbound_channel();
+                let (received, rx) = watch::channel(None);
+                let revision = Arc::new(AtomicU64::new(0));
+                let mut bridge = Bridge::with_generation(out, received, revision.clone());
+                bridge.set_active(true);
+                bridge.on_message(
+                    ClipboardMsg::Offer {
+                        serial: 9,
+                        mime_types: vec![TEXT_MIME.into()],
+                        files: vec![],
+                    },
+                    Bytes::new(),
+                );
+                let (ClipboardMsg::Request { id, .. }, _) = messages.recv().await.unwrap() else {
+                    panic!("fetch request")
+                };
+                assert!(bridge.offer("newer local selection".into()).is_some());
+                let old = b"older remote selection";
+                bridge.on_message(
+                    ClipboardMsg::Data {
+                        id,
+                        offset: 0,
+                        data_len: old.len() as u32,
+                        done: true,
+                    },
+                    Bytes::from_static(old),
+                );
+                tokio::task::yield_now().await;
+                assert!(rx.borrow().is_none());
+
+                bridge.on_message(
+                    ClipboardMsg::Offer {
+                        serial: 10,
+                        mime_types: vec![TEXT_MIME.into()],
+                        files: vec![],
+                    },
+                    Bytes::new(),
+                );
+                let id = loop {
+                    if let (ClipboardMsg::Request { id, .. }, _) = messages.recv().await.unwrap() {
+                        break id;
+                    }
+                };
+                // GUI observed a new local copy before its command was drained.
+                revision.fetch_add(1, Ordering::SeqCst);
+                bridge.on_message(
+                    ClipboardMsg::Data {
+                        id,
+                        offset: 0,
+                        data_len: old.len() as u32,
+                        done: true,
+                    },
+                    Bytes::from_static(old),
+                );
+                tokio::task::yield_now().await;
+                assert!(rx.borrow().is_none());
+            })
+            .await;
+    }
     #[test]
     fn clipboard_epochs_discard_previous_tabs_and_poll_does_not_replace_write() {
         // Exercise slots without opening a real OS clipboard.

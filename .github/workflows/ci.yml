@@ -93,6 +93,10 @@ jobs:
           }
           Get-Command nasm.exe -ErrorAction Stop | Out-Host
           $nasmPath >> $env:GITHUB_PATH
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-msvc-static
+          cache-on-failure: "true"
       - name: Test packaging and winget preparation scripts
         run: |
           New-Item artifacts/windows-tests -ItemType Directory -Force | Out-Null
@@ -101,11 +105,23 @@ jobs:
         run: ./scripts/windows/build.ps1
       - name: Package and validate ZIP and unsigned test MSIX
         run: ./scripts/windows/package.ps1 *>&1 | Tee-Object artifacts/windows-tests/package.txt
+      - name: Prepare signed disposable-VM install and upgrade fixtures
+        run: |
+          . ./scripts/windows/common.ps1
+          $base = "gliff-$(Get-ReleaseVersion)-windows-x64"
+          ./scripts/windows/package-test-msix.ps1 -UnsignedMsix "artifacts/windows/$base-TEST-ONLY.msix"
       - name: Upload test distributions (MSIX is unsigned TEST-ONLY)
         uses: actions/upload-artifact@v4
         with:
           name: windows-x64
           path: artifacts/windows/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload signed disposable-VM installer fixtures
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msix-test
+          path: artifacts/windows-msix-test/*
           if-no-files-found: error
           retention-days: 14
       - name: Upload Windows test results

@@ -77,10 +77,13 @@ fn walk(
     if out.entries.len() >= MAX_FILE_ENTRIES {
         return Err(FilesError::TooMany(out.entries.len() + 1).into());
     }
+    // Native separators differ on Windows; the protocol always uses '/'.
     let rel_str = rel
-        .to_str()
+        .iter()
+        .map(|part| part.to_str())
+        .collect::<Option<Vec<_>>>()
         .ok_or_else(|| FilesError::BadPath(rel.to_string_lossy().into_owned()))?
-        .to_string();
+        .join("/");
     if is_dir {
         out.entries.push(ClipboardFile {
             path: rel_str,

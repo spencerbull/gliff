@@ -50,6 +50,16 @@ cover the executable and all three accompanying documents. Hashes identify
 bytes; they do not authenticate an unsigned download. The external checksum
 file is regenerated after signing for public release artifacts.
 
+CI also uploads a separate `windows-msix-test` artifact for clean VM installation
+tests. It contains test-signed install/upgrade MSIX packages, a short-lived
+self-signed public certificate, checksums and instructions. The upgrade fixture
+changes only MSIX revision `.0` to `.1`, preserving the tested executable. The
+signing key is nonexportable and removed from the ephemeral runner; it is never
+uploaded. These packages require explicitly trusting the supplied test
+certificate in the disposable VM. The public release job consumes only
+`windows-x64` and cannot attach these fixtures. Signature trust and actual
+install/upgrade behavior still have to be verified inside the VM.
+
 Packaging reads only `[workspace.package].version`, maps `major.minor.patch` to
 MSIX `major.minor.patch.0`, and fixes the supported architecture to x64/MSVC.
 Components must be at most 65535. Prerelease/build suffixes are rejected rather

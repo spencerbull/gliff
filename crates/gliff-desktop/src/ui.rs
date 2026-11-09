@@ -22,6 +22,7 @@ struct Tab {
     captured: bool,
     resize: Option<(u32, u32, u32)>,
     resized_at: Instant,
+    connection_epoch: u64,
 }
 impl Tab {
     fn new(host: String) -> Self {
@@ -35,6 +36,7 @@ impl Tab {
             captured: false,
             resize: None,
             resized_at: Instant::now(),
+            connection_epoch: 0,
         }
     }
     fn release(&mut self) {
@@ -45,6 +47,18 @@ impl Tab {
                 session.send(Command::Release);
             }
         }
+    }
+    fn synchronize_connection(&mut self, epoch: u64) -> bool {
+        if self.connection_epoch == epoch {
+            return false;
+        }
+        self.release();
+        self.connection_epoch = epoch;
+        self.resize = None;
+        self.texture = None;
+        self.picture_geometry = None;
+        self.cursor = None;
+        true
     }
     fn input(&self, messages: Vec<ClientMsg>) {
         if !messages.is_empty() {
@@ -224,77 +238,188 @@ impl eframe::App for Desktop {
         let replacement_capacity = self.worker_count() < MAX_TABS;
         egui::CentralPanel::default().show(ctx, |ui| {
             let Some(tab) = self.tabs.get_mut(self.selected) else {
-                ui.centered_and_justified(|ui| { ui.label("Enter an SSH host to start a session."); }); return;
+                ui.centered_and_justified(|ui| {
+                    ui.label("Enter an SSH host to start a session.");
+                });
+                return;
             };
             let Some(session) = &tab.session else {
                 ui.label("Restored tab · disconnected");
-                if ui.add_enabled(replacement_capacity, egui::Button::new("Reconnect")).clicked() {
+                if ui
+                    .add_enabled(replacement_capacity, egui::Button::new("Reconnect"))
+                    .clicked()
+                {
                     tab.session = Some(Session::start(tab.host.clone(), self.options.clone()));
                 }
                 return;
             };
-            if session.set_clipboard_active(ctx.input(|i| i.focused) && !self.options.no_clipboard) {
+            if session.set_clipboard_active(ctx.input(|i| i.focused) && !self.options.no_clipboard)
+            {
                 self.clipboard_text = None;
-                if let Some(clipboard) = &self.clipboard { clipboard.clear(); }
+                if let Some(clipboard) = &self.clipboard {
+                    clipboard.clear();
+                }
             }
-            let (status, connected, headless, geometry, picture, cursor, cursor_pos, remote_text) = {
+            let (
+                epoch,
+                status,
+                connected,
+                headless,
+                geometry,
+                picture,
+                cursor,
+                cursor_pos,
+                remote_text,
+            ) = {
                 let mut s = session.state.lock().unwrap();
-                (s.status.clone(), s.connected, s.headless, s.geometry, s.picture.take(), s.cursor.take(), s.cursor_pos, s.clipboard.take())
+                (
+                    s.connection_epoch,
+                    s.status.clone(),
+                    s.connected,
+                    s.headless,
+                    s.geometry,
+                    s.picture.take(),
+                    s.cursor.take(),
+                    s.cursor_pos,
+                    s.clipboard.take(),
+                )
             };
+            if tab.synchronize_connection(epoch) {
+                self.clipboard_text = None;
+                if let Some(clipboard) = &self.clipboard {
+                    clipboard.clear();
+                }
+            }
             ui.label(status);
             let mut reconnect = false;
             ui.horizontal(|ui| {
-                if ui.button("Disconnect").clicked() { tab.release(); if let Some(s) = &tab.session { s.disconnect(); } }
-                reconnect = ui.add_enabled(replacement_capacity || tab.session.as_ref().is_some_and(Session::finished), egui::Button::new("Reconnect")).clicked();
-                ui.label(if tab.captured { "Remote input active" } else { "Local input active" });
+                if ui.button("Disconnect").clicked() {
+                    tab.release();
+                    if let Some(s) = &tab.session {
+                        s.disconnect();
+                    }
+                }
+                reconnect = ui
+                    .add_enabled(
+                        replacement_capacity || tab.session.as_ref().is_some_and(Session::finished),
+                        egui::Button::new("Reconnect"),
+                    )
+                    .clicked();
+                ui.label(if tab.captured {
+                    "Remote input active"
+                } else {
+                    "Local input active"
+                });
             });
             if reconnect {
                 tab.release();
                 if let Some(session) = tab.session.take() {
-                    session.disconnect(); self.retired.push(session);
+                    session.disconnect();
+                    self.retired.push(session);
                 }
                 // Clear stale screen and input state when replacing a connection.
-                tab.texture = None; tab.picture_geometry = None; tab.cursor = None; tab.resize = None;
+                tab.texture = None;
+                tab.picture_geometry = None;
+                tab.cursor = None;
+                tab.resize = None;
                 tab.session = Some(Session::start(tab.host.clone(), self.options.clone()));
                 self.clipboard_text = None;
-                if let Some(clipboard) = &self.clipboard { clipboard.clear(); }
+                if let Some(clipboard) = &self.clipboard {
+                    clipboard.clear();
+                }
                 return;
             }
-            if !connected { tab.release(); return; }
+            if !connected {
+                tab.release();
+                return;
+            }
             if let Some(picture) = picture {
-                let image = bgra_image(picture.frame.width, picture.frame.height, &picture.frame.pixels);
-                if let Some(texture) = &mut tab.texture { texture.set(image, TextureOptions::LINEAR); }
-                else { tab.texture = Some(ctx.load_texture(format!("video-{}", self.selected), image, TextureOptions::LINEAR)); }
+                let image = bgra_image(
+                    picture.frame.width,
+                    picture.frame.height,
+                    &picture.frame.pixels,
+                );
+                if let Some(texture) = &mut tab.texture {
+                    texture.set(image, TextureOptions::LINEAR);
+                } else {
+                    tab.texture = Some(ctx.load_texture(
+                        format!("video-{}", self.selected),
+                        image,
+                        TextureOptions::LINEAR,
+                    ));
+                }
                 tab.picture_geometry = Some(picture.geometry);
             }
             if let Some(cursor) = cursor {
-                tab.cursor = if cursor.bgra.is_empty() { None } else {
-                    Some((cursor.id, ctx.load_texture("remote cursor", bgra_image(cursor.size[0], cursor.size[1], &cursor.bgra), TextureOptions::LINEAR), cursor.size, cursor.hotspot))
+                tab.cursor = if cursor.bgra.is_empty() {
+                    None
+                } else {
+                    Some((
+                        cursor.id,
+                        ctx.load_texture(
+                            "remote cursor",
+                            bgra_image(cursor.size[0], cursor.size[1], &cursor.bgra),
+                            TextureOptions::LINEAR,
+                        ),
+                        cursor.size,
+                        cursor.hotspot,
+                    ))
                 };
             }
             let available = ui.available_rect_before_wrap();
-            let Some(geometry) = tab.picture_geometry.or(geometry) else { return; };
+            let Some(geometry) = tab.picture_geometry.or(geometry) else {
+                return;
+            };
             let rect = geometry.fit(available);
             if let Some(texture) = &tab.texture {
-                ui.painter().image(texture.id(), rect, Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)), Color32::WHITE);
+                ui.painter().image(
+                    texture.id(),
+                    rect,
+                    Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
             }
             let response = ui.allocate_rect(available, Sense::click());
-            if response.hovered() && ui.input(|i| i.pointer.any_pressed()) && ui.input(|i| i.pointer.interact_pos().is_some_and(|p| rect.contains(p))) {
-                tab.captured = true; response.request_focus();
+            if response.hovered()
+                && ui.input(|i| i.pointer.any_pressed())
+                && ui.input(|i| i.pointer.interact_pos().is_some_and(|p| rect.contains(p)))
+            {
+                tab.captured = true;
+                response.request_focus();
             }
             let focused = ctx.input(|i| i.focused);
-            if !focused || (ctx.wants_keyboard_input() && !response.has_focus()) { tab.release(); }
+            if !focused || (ctx.wants_keyboard_input() && !response.has_focus()) {
+                tab.release();
+            }
             if tab.captured {
                 response.request_focus();
-                let events = self.remote_events.take().unwrap_or_else(|| ctx.input(|i| i.events.clone()));
+                let events = self
+                    .remote_events
+                    .take()
+                    .unwrap_or_else(|| ctx.input(|i| i.events.clone()));
                 for event in events {
                     match event {
-                        Event::Key { key, physical_key, pressed, modifiers, repeat, .. } => {
-                            if key == Key::Escape && modifiers.shift && pressed { tab.release(); break; }
-                            let modifiers = tab.held.modifiers(modifiers); tab.input(modifiers);
+                        Event::Key {
+                            key,
+                            physical_key,
+                            pressed,
+                            modifiers,
+                            repeat,
+                            ..
+                        } => {
+                            if key == Key::Escape && modifiers.shift && pressed {
+                                tab.release();
+                                break;
+                            }
+                            let modifiers = tab.held.modifiers(modifiers);
+                            tab.input(modifiers);
                             if !repeat {
                                 if let Some(code) = physical_key.and_then(keycode) {
-                                    let messages = if pressed { tab.held.key(code, true) } else { tab.held.key_up(code, ctx.input(|i| i.modifiers)) };
+                                    let messages = if pressed {
+                                        tab.held.key(code, true)
+                                    } else {
+                                        tab.held.key_up(code, ctx.input(|i| i.modifiers))
+                                    };
                                     tab.input(messages);
                                 }
                             }
@@ -303,65 +428,136 @@ impl eframe::App for Desktop {
                             // egui swallowed the physical press. Remember its
                             // modifiers, then recover the actual US position on
                             // key-up (also distinguishes Ctrl+Insert from Ctrl+C).
-                            let kind = match event { Event::Copy => 0, Event::Cut => 1, _ => 2 };
+                            let kind = match event {
+                                Event::Copy => 0,
+                                Event::Cut => 1,
+                                _ => 2,
+                            };
                             tab.held.shortcut(kind, ctx.input(|i| i.modifiers));
                         }
                         Event::PointerMoved(pos) => {
                             // Clamp drag coordinates to the image edge; bars never
                             // become remote desktop coordinates.
-                            let pos = if ui.input(|i| i.pointer.any_down()) { rect.clamp(pos) } else { pos };
-                            if let Some([x, y]) = geometry.remote(rect, pos) { tab.input(vec![ClientMsg::PointerMotion { x, y }]); }
+                            let pos = if ui.input(|i| i.pointer.any_down()) {
+                                rect.clamp(pos)
+                            } else {
+                                pos
+                            };
+                            if let Some([x, y]) = geometry.remote(rect, pos) {
+                                tab.input(vec![ClientMsg::PointerMotion { x, y }]);
+                            }
                         }
-                        Event::PointerButton { pos, button, pressed, modifiers } => {
-                            let mods = tab.held.modifiers(modifiers); tab.input(mods);
+                        Event::PointerButton {
+                            pos,
+                            button,
+                            pressed,
+                            modifiers,
+                        } => {
+                            let mods = tab.held.modifiers(modifiers);
+                            tab.input(mods);
                             if !pressed || rect.contains(pos) {
-                                let messages = tab.held.button(button_code(button), pressed); tab.input(messages);
+                                let messages = tab.held.button(button_code(button), pressed);
+                                tab.input(messages);
                             }
                         }
                         Event::MouseWheel { unit, delta, .. } if response.hovered() => {
-                            let factor = match unit { MouseWheelUnit::Point => 1.0, MouseWheelUnit::Line => 15.0, MouseWheelUnit::Page => rect.height() };
-                            for (axis, value) in [(Axis::Horizontal, delta.x), (Axis::Vertical, delta.y)] {
-                                if value != 0.0 { tab.input(vec![ClientMsg::PointerAxis { axis, value: -(value * factor) as f64, discrete: if unit == MouseWheelUnit::Line { Some(-value.round() as i32) } else { None }, stop: false }]); }
+                            let factor = match unit {
+                                MouseWheelUnit::Point => 1.0,
+                                MouseWheelUnit::Line => 15.0,
+                                MouseWheelUnit::Page => rect.height(),
+                            };
+                            for (axis, value) in
+                                [(Axis::Horizontal, delta.x), (Axis::Vertical, delta.y)]
+                            {
+                                if value != 0.0 {
+                                    tab.input(vec![ClientMsg::PointerAxis {
+                                        axis,
+                                        value: -(value * factor) as f64,
+                                        discrete: if unit == MouseWheelUnit::Line {
+                                            Some(-value.round() as i32)
+                                        } else {
+                                            None
+                                        },
+                                        stop: false,
+                                    }]);
+                                }
                             }
                         }
-                        Event::WindowFocused(false) => { tab.release(); break; }
+                        Event::WindowFocused(false) => {
+                            tab.release();
+                            break;
+                        }
                         _ => {}
                     }
                 }
-                if tab.captured { let mods = tab.held.modifiers(ctx.input(|i| i.modifiers)); tab.input(mods); }
+                if tab.captured {
+                    let mods = tab.held.modifiers(ctx.input(|i| i.modifiers));
+                    tab.input(mods);
+                }
             }
             if let Some((x, y, shape_id, true)) = cursor_pos {
                 if let Some((id, texture, size, hotspot)) = &tab.cursor {
                     if *id == shape_id {
                         let factor = rect.width() / geometry.stream[0] as f32;
-                        let point = geometry.local(rect, x, y) - egui::vec2(hotspot[0] as f32, hotspot[1] as f32) * factor;
-                        let cursor_rect = Rect::from_min_size(point, egui::vec2(size[0] as f32, size[1] as f32) * factor);
-                        ui.painter().with_clip_rect(rect).image(texture.id(), cursor_rect, Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)), Color32::WHITE);
+                        let point = geometry.local(rect, x, y)
+                            - egui::vec2(hotspot[0] as f32, hotspot[1] as f32) * factor;
+                        let cursor_rect = Rect::from_min_size(
+                            point,
+                            egui::vec2(size[0] as f32, size[1] as f32) * factor,
+                        );
+                        ui.painter().with_clip_rect(rect).image(
+                            texture.id(),
+                            cursor_rect,
+                            Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
+                            Color32::WHITE,
+                        );
                     }
                 }
             }
-            if tab.captured && response.hovered() { ctx.set_cursor_icon(egui::CursorIcon::None); }
+            if tab.captured && response.hovered() {
+                ctx.set_cursor_icon(egui::CursorIcon::None);
+            }
             if headless && tab.resized_at.elapsed() > Duration::from_millis(250) {
                 let dpi = ctx.pixels_per_point();
-                let resize = ((available.width() * dpi).clamp(320.0, 4096.0) as u32 & !1,
-                    (available.height() * dpi).clamp(240.0, 4096.0) as u32 & !1, (dpi.clamp(0.5, 4.0) * 1000.0) as u32);
+                let resize = (
+                    (available.width() * dpi).clamp(320.0, 4096.0) as u32 & !1,
+                    (available.height() * dpi).clamp(240.0, 4096.0) as u32 & !1,
+                    (dpi.clamp(0.5, 4.0) * 1000.0) as u32,
+                );
                 if tab.resize != Some(resize) {
-                    if let Some(session) = &tab.session { session.send(Command::Resize(resize.0, resize.1, resize.2 as f32 / 1000.0)); }
-                    tab.resize = Some(resize); tab.resized_at = Instant::now();
+                    if let Some(session) = &tab.session {
+                        session.send(Command::Resize(
+                            resize.0,
+                            resize.1,
+                            resize.2 as f32 / 1000.0,
+                        ));
+                    }
+                    tab.resize = Some(resize);
+                    tab.resized_at = Instant::now();
                 }
             }
             if focused {
                 if let Some(clipboard) = &self.clipboard {
-                    if let Some(text) = remote_text {
-                        self.clipboard_text = Some(text.clone()); clipboard.set(text);
-                    }
                     if self.clipboard_poll.elapsed() >= Duration::from_millis(500) {
-                        clipboard.poll(); self.clipboard_poll = Instant::now();
+                        clipboard.poll();
+                        self.clipboard_poll = Instant::now();
                     }
+                    let mut local_changed = false;
                     if let Some(text) = clipboard.take() {
                         if self.clipboard_text.as_ref() != Some(&text) {
-                            if let Some(session) = &tab.session { session.send(Command::Text(text.clone())); }
+                            if let Some(session) = &tab.session {
+                                session.send(Command::Text(text.clone()));
+                            }
                             self.clipboard_text = Some(text);
+                            local_changed = true;
+                        }
+                    }
+                    // A newly observed local copy wins over a remote result
+                    // that was already waiting when this frame began.
+                    if !local_changed {
+                        if let Some(text) = remote_text {
+                            self.clipboard_text = Some(text.clone());
+                            clipboard.set(text);
                         }
                     }
                 }
@@ -410,6 +606,23 @@ impl Drop for Desktop {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn reconnect_epoch_replays_headless_geometry_and_clipboard() {
+        let mut tab = Tab::new("host".into());
+        assert!(tab.synchronize_connection(1));
+        tab.resize = Some((1280, 800, 1500));
+        tab.captured = true;
+        tab.held.key(30, true);
+        assert!(!tab.synchronize_connection(1));
+        assert_eq!(tab.resize, Some((1280, 800, 1500)));
+        // Even if the UI missed the disconnected frame, a new connection
+        // invalidates the resize and asks its caller to refresh clipboard state.
+        assert!(tab.synchronize_connection(2));
+        assert!(tab.resize.is_none());
+        assert!(!tab.captured);
+        assert!(tab.held.release().is_empty());
+        assert!(!tab.synchronize_connection(2));
+    }
     #[test]
     fn restores_configured_tabs_and_selection_without_connecting() {
         let saved = Saved {

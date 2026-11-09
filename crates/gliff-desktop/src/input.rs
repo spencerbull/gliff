@@ -99,6 +99,7 @@ pub struct Held {
     keys: BTreeSet<u32>,
     buttons: BTreeSet<u32>,
     shortcuts: Vec<(u8, Modifiers)>,
+    paste_modifiers: Option<Modifiers>,
 }
 
 impl Held {
@@ -125,6 +126,11 @@ impl Held {
         }
     }
     pub fn key_up(&mut self, code: u32, current: Modifiers) -> Vec<ClientMsg> {
+        let paste_modifiers = if matches!(code, 47 | 110) {
+            self.paste_modifiers.take()
+        } else {
+            None
+        };
         if self.keys.contains(&code) {
             return self.key(code, false);
         }
@@ -139,6 +145,12 @@ impl Held {
             || (current.shift && matches!(code, 110 | 111))
         {
             current
+        } else if let Some(modifiers) = paste_modifiers
+            .filter(|m| (m.ctrl && matches!(code, 47 | 110)) || (m.shift && code == 110))
+        {
+            // egui can consume Paste-down without emitting Paste when the
+            // local clipboard is empty. Ctrl/Shift may already be released.
+            modifiers
         } else {
             return vec![];
         };
@@ -146,6 +158,7 @@ impl Held {
         messages.extend(self.key(code, true));
         messages.extend(self.key(code, false));
         messages.extend(self.modifiers(current));
+        self.paste_modifiers = (current.ctrl || current.shift).then_some(current);
         messages
     }
     pub fn button(&mut self, code: u32, pressed: bool) -> Vec<ClientMsg> {
@@ -164,6 +177,9 @@ impl Held {
         }
     }
     pub fn modifiers(&mut self, modifiers: Modifiers) -> Vec<ClientMsg> {
+        if modifiers.ctrl || modifiers.shift {
+            self.paste_modifiers = Some(modifiers);
+        }
         [
             (42, modifiers.shift),
             (29, modifiers.ctrl),
@@ -187,6 +203,7 @@ impl Held {
     }
     pub fn release(&mut self) -> Vec<ClientMsg> {
         self.shortcuts.clear();
+        self.paste_modifiers = None;
         let keys = std::mem::take(&mut self.keys)
             .into_iter()
             .map(|keycode| ClientMsg::Key {
@@ -270,5 +287,55 @@ mod tests {
             pressed: false
         }));
         assert!(held.release().is_empty());
+    }
+
+    #[test]
+    fn empty_clipboard_paste_survives_modifier_released_before_key() {
+        for (code, modifiers, modifier_code) in
+            [(47, Modifiers::CTRL, 29), (110, Modifiers::SHIFT, 42)]
+        {
+            let mut held = Held::default();
+            held.modifiers(modifiers);
+            // No Copy/Paste event is emitted by egui for an empty clipboard.
+            held.modifiers(Modifiers::NONE);
+            let messages = held.key_up(code, Modifiers::NONE);
+            assert_eq!(
+                messages,
+                vec![
+                    ClientMsg::Key {
+                        keycode: modifier_code,
+                        pressed: true
+                    },
+                    ClientMsg::Key {
+                        keycode: code,
+                        pressed: true
+                    },
+                    ClientMsg::Key {
+                        keycode: code,
+                        pressed: false
+                    },
+                    ClientMsg::Key {
+                        keycode: modifier_code,
+                        pressed: false
+                    },
+                ]
+            );
+            assert!(held.release().is_empty());
+            assert!(held.key_up(code, Modifiers::NONE).is_empty());
+        }
+        let mut held = Held::default();
+        held.modifiers(Modifiers::CTRL);
+        held.release(); // Focus loss must discard pending shortcut history.
+        assert!(held.key_up(47, Modifiers::NONE).is_empty());
+        held.modifiers(Modifiers::CTRL);
+        held.modifiers(Modifiers::NONE);
+        held.key(47, true); // An ordinary V press has its own event.
+        assert_eq!(
+            held.key_up(47, Modifiers::NONE),
+            vec![ClientMsg::Key {
+                keycode: 47,
+                pressed: false,
+            }]
+        );
     }
 }

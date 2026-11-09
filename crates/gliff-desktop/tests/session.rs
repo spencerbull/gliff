@@ -541,6 +541,7 @@ async fn reconnect_survives_a_failed_setup_after_an_established_session() {
         );
         if attempt == 2 {
             assert!(session.state.lock().unwrap().connected);
+            assert_eq!(session.state.lock().unwrap().connection_epoch, 3);
             session.disconnect();
             assert_eq!(read.read_msg::<ClientMsg>().await.unwrap(), ClientMsg::Bye);
         }
