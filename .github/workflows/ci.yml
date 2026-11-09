@@ -2,9 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
     tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -41,7 +42,7 @@ jobs:
       - run: mbx test --workspace --locked
 
   release:
-    needs: [fmt, clippy, test]
+    needs: [fmt, clippy, test, windows]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
@@ -67,3 +68,138 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "gliff ${{ steps.version.outputs.version }}" \
             --generate-notes
+
+  windows:
+    name: Windows x64 MSVC
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Set up native toolchain
+        run: |
+          . ./scripts/windows/common.ps1
+          Invoke-Checked rustup @('toolchain', 'install', 'stable', '--profile', 'minimal', '--component', 'rustfmt,clippy')
+          Invoke-Checked rustup @('default', 'stable')
+          Invoke-Checked rustup @('target', 'add', 'x86_64-pc-windows-msvc')
+          $nasmPath = 'C:\Program Files\NASM'
+          $env:PATH = "$nasmPath;$env:PATH"
+          if (-not (Get-Command nasm.exe -ErrorAction SilentlyContinue)) {
+            Invoke-Checked choco @('install', 'nasm', '--no-progress', '-y')
+          }
+          Get-Command nasm.exe -ErrorAction Stop | Out-Host
+          $nasmPath >> $env:GITHUB_PATH
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-msvc-static
+          cache-on-failure: "true"
+      - name: Test packaging and winget preparation scripts
+        run: |
+          New-Item artifacts/windows-tests -ItemType Directory -Force | Out-Null
+          ./scripts/windows/test-scripts.ps1 -ResultsDirectory artifacts/windows-tests/script-fixtures *>&1 | Tee-Object artifacts/windows-tests/packaging-tests.txt
+      - name: Format, lint, test and build the portable client
+        run: ./scripts/windows/build.ps1
+      - name: Package and validate ZIP and unsigned test MSIX
+        run: ./scripts/windows/package.ps1 *>&1 | Tee-Object artifacts/windows-tests/package.txt
+      - name: Prepare signed disposable-VM install and upgrade fixtures
+        run: |
+          . ./scripts/windows/common.ps1
+          $base = "gliff-$(Get-ReleaseVersion)-windows-x64"
+          ./scripts/windows/package-test-msix.ps1 -UnsignedMsix "artifacts/windows/$base-TEST-ONLY.msix"
+      - name: Upload test distributions (MSIX is unsigned TEST-ONLY)
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: artifacts/windows/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload signed disposable-VM installer fixtures
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msix-test
+          path: artifacts/windows-msix-test/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload Windows test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-results
+          path: artifacts/windows-tests/*
+          if-no-files-found: warn
+          retention-days: 14
+
+  windows-release:
+    # The source-release job is the sole creator of the GitHub release. Wait
+    # for it before attaching anything; unsigned branch MSIX is never uploaded.
+    needs: [release, windows]
+    if: github.ref_type == 'tag'
+    runs-on: windows-2022
+    environment: windows-release
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-x64
+          path: artifacts/windows-input
+      - name: Prepare public artifacts and optionally sign MSIX
+        env:
+          GLIFF_WINDOWS_PUBLISHER: ${{ vars.GLIFF_WINDOWS_PUBLISHER }}
+          GLIFF_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          GLIFF_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: |
+          . ./scripts/windows/common.ps1
+          $version = Get-ReleaseVersion
+          if ($env:GITHUB_REF_NAME -cne "v$version") { throw 'Release tag does not match workspace version.' }
+          $base = "gliff-$version-windows-x64"
+          $public = Join-Path $PWD 'artifacts/windows-public'
+          New-Item $public -ItemType Directory -Force | Out-Null
+          $zip = Join-Path $PWD "artifacts/windows-input/$base.zip"
+          Test-PortableZip $zip
+          Copy-Item $zip $public
+          $names = @("$base.zip")
+          $hasPfx = -not [string]::IsNullOrWhiteSpace($env:GLIFF_SIGNING_PFX_BASE64)
+          $hasPassword = -not [string]::IsNullOrWhiteSpace($env:GLIFF_SIGNING_PFX_PASSWORD)
+          $hasPublisher = -not [string]::IsNullOrWhiteSpace($env:GLIFF_WINDOWS_PUBLISHER)
+          if ($hasPfx -or $hasPassword -or $hasPublisher) {
+            if (-not ($hasPfx -and $hasPassword -and $hasPublisher)) { throw 'Incomplete public signing configuration.' }
+            $source = Join-Path $PWD 'artifacts/windows-release-source'
+            Expand-Archive $zip $source -Force
+            $staging = Join-Path $PWD 'artifacts/windows-signing'
+            ./scripts/windows/package.ps1 -Executable "$source/gliff.exe" -OutputDirectory $staging -Publisher $env:GLIFF_WINDOWS_PUBLISHER
+            $signed = Join-Path $public "$base.msix"
+            ./scripts/windows/sign.ps1 -InputFile "$staging/$base-TEST-ONLY.msix" -OutputFile $signed -Publisher $env:GLIFF_WINDOWS_PUBLISHER
+            ./scripts/windows/test-package.ps1 -PortableZip $zip -Msix $signed -Publisher $env:GLIFF_WINDOWS_PUBLISHER
+            $names += "$base.msix"
+          } else {
+            Write-Host 'No public signing identity configured: publishing portable ZIP only.'
+          }
+          Write-Hashes $public $names 'SHA256SUMS-windows.txt'
+      - name: Attach allowlisted Windows artifacts to the existing release
+        run: |
+          . ./scripts/windows/common.ps1
+          $base = "gliff-$(Get-ReleaseVersion)-windows-x64"
+          $files = @("artifacts/windows-public/$base.zip", 'artifacts/windows-public/SHA256SUMS-windows.txt')
+          $signed = "artifacts/windows-public/$base.msix"
+          if (Test-Path $signed) {
+            Invoke-Checked (Get-SdkTool signtool.exe) @('verify', '/pa', '/all', '/v', $signed)
+            $files += $signed
+          }
+          # Deliberately no wildcard or --clobber: never expose test MSIX or
+          # silently replace a release asset that users may already have hashed.
+          Invoke-Checked gh (@('release', 'upload', $env:GITHUB_REF_NAME) + $files)

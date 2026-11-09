@@ -1,0 +1,12 @@
+{
+  "gliff": [
+    {
+      "ProcessId": 6024,
+      "CommandLine": "\"C:\\GliffAcceptance\\14ef60d\\gliff.exe\" gliff-validation --server-bin gliff-incompatible-validation"
+    }
+  ],
+  "case": "incompatible-protocol",
+  "utc": "2026-11-09T16:18:57.2463475Z",
+  "ssh": [],
+  "client": "14ef60d"
+}

@@ -1,0 +1,39 @@
+[
+  {
+    "pid": 1702603,
+    "start_ticks": "23525178",
+    "signaled": "SIGTERM",
+    "remaining": false
+  },
+  {
+    "pid": 1701026,
+    "start_ticks": "23509802",
+    "signaled": "SIGTERM",
+    "remaining": false
+  },
+  {
+    "pid": 1701706,
+    "start_ticks": "23516709",
+    "signaled": "SIGTERM",
+    "remaining": false
+  },
+  {
+    "pid": 1767236,
+    "start_ticks": "23719991",
+    "signaled": "SIGTERM",
+    "remaining": false
+  },
+  {
+    "pid": 1726633,
+    "start_ticks": "23585427",
+    "signaled": "SIGTERM",
+    "remaining": false
+  },
+  {
+    "pid": 1726566,
+    "start_ticks": "23584576",
+    "signaled": "SIGTERM",
+    "remaining": false,
+    "note": "driver was a zombie, its owned host-cua parent was then terminated to reap it"
+  }
+]

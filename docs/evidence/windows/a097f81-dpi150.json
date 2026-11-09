@@ -1,0 +1,58 @@
+{
+  "client_commit": "a097f812c1c0bad0655e008175948b15b3540d16",
+  "server_source_base": "5004bf5",
+  "display_settings": {
+    "resolution": [
+      1920,
+      1080
+    ],
+    "scale_percent": 150,
+    "method": "Windows Settings UIA selection"
+  },
+  "remote_monitor": {
+    "name": "gliff-1874289",
+    "position": [
+      4822,
+      0
+    ],
+    "physical": [
+      1170,
+      678
+    ],
+    "scale": 1.5
+  },
+  "clicked_screenshot_pixels": [
+    300,
+    350
+  ],
+  "rendered_image_origin_approximately": [
+    14,
+    206
+  ],
+  "expected_remote_logical_approximately": [
+    190.7,
+    96.0
+  ],
+  "observed_remote_global": [
+    5012,
+    96
+  ],
+  "observed_remote_logical": [
+    190,
+    96
+  ],
+  "cursor_trace_samples": 858,
+  "trace_unique_positions": [
+    [
+      5012,
+      96
+    ],
+    [
+      5450,
+      222
+    ]
+  ],
+  "remote_terminal_observed": "SGR button down/up at cell 22,4; independent cursor trace establishes finer position",
+  "cursor_visible_in_capture": true,
+  "note": "Verified old egui pointer path; revised ordered native pointer path still needs final artifact rerun. Existing raw recording in local acceptance/evidence/gliff-a097f81-dpi150."
+}

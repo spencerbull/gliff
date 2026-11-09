@@ -213,7 +213,9 @@ impl Instance {
     ) -> Result<()> {
         let keyword = format!("keyword monitor {name},{width}x{height}@{hz},auto,{scale}");
         match self.dispatch(&keyword) {
-            Err(Error::Command { response, .. }) if response.contains("non-legacy") => {
+            Err(Error::Command { response, .. })
+                if response.contains("non-legacy") || response == "unknown request" =>
+            {
                 self.dispatch(&format!(
                     "eval hl.monitor({{ output = \"{name}\", mode = \"{width}x{height}@{hz}\", position = \"auto\", scale = {scale} }})"
                 ))
@@ -406,6 +408,39 @@ mod tests {
         });
         assert!(result.is_ok());
         assert_eq!(commands, ["dispatch dpms on gliff-7"]);
+    }
+
+    #[test]
+    fn monitor_mode_handles_both_lua_rejections_without_masking_mode_errors() {
+        let keyword = "keyword monitor gliff-7,982x552@60,auto,1";
+        let lua = r#"eval hl.monitor({ output = "gliff-7", mode = "982x552@60", position = "auto", scale = 1 })"#;
+        let (result, commands) = against_socket(&["ok"], |i| {
+            i.set_monitor_mode("gliff-7", 982, 552, 60, 1.0)
+        });
+        assert!(result.is_ok());
+        assert_eq!(commands, [keyword]);
+        for rejection in ["unknown request", "not supported with non-legacy config"] {
+            let replies: &'static [&'static str] = if rejection == "unknown request" {
+                &["unknown request", "ok"]
+            } else {
+                &["not supported with non-legacy config", "ok"]
+            };
+            let (result, commands) = against_socket(replies, |i| {
+                i.set_monitor_mode("gliff-7", 982, 552, 60, 1.0)
+            });
+            assert!(
+                result.is_ok(),
+                "Lua fallback failed for {rejection}: {result:?}"
+            );
+            assert_eq!(commands, [keyword, lua]);
+        }
+        let (result, commands) = against_socket(&["Invalid scale"], |i| {
+            i.set_monitor_mode("gliff-7", 982, 552, 60, 1.0)
+        });
+        assert!(
+            matches!(result, Err(Error::Command { response, .. }) if response == "Invalid scale")
+        );
+        assert_eq!(commands, [keyword]);
     }
 
     #[test]

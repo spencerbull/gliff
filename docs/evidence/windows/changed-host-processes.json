@@ -1,0 +1,12 @@
+{
+  "gliff": [
+    {
+      "ProcessId": 8068,
+      "CommandLine": "\"C:\\GliffAcceptance\\a097f81\\gliff.exe\" gliff-changed-key"
+    }
+  ],
+  "case": "changed-host-key",
+  "utc": "2026-11-09T16:07:06.5364118Z",
+  "ssh": [],
+  "client": "a097f81"
+}

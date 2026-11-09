@@ -6,6 +6,11 @@ design is in `docs/architecture.md`; driver-specific behaviour is in
 
 ## Build
 
+For the Windows client, use the native MSVC build and package scripts in
+[Windows distribution](windows-packaging.md). They build the `gliff-desktop`
+package explicitly and check its Windows dependency closure. The existing
+Linux GTK client, server, and probe use the build instructions below.
+
 ```
 bin/build
 ```
@@ -62,6 +67,12 @@ and `--full-chroma` on a CPU server keeps 4:4:4. Server and client pick their
 tiers independently, so every pairing can be tested on one machine.
 
 ## Testing
+
+Windows has an additional native build/test/package job in
+`.github/workflows/ci.yml`. Portable ZIP and MSIX structural checks complement
+the real Windows-to-Omarchy tests defined in [windows-plan.md](windows-plan.md).
+Linux checks and synthetic protocol sessions do not establish Windows GUI or
+installer behavior.
 
 - **`scripts/check.sh`** runs what CI runs (`cargo fmt --check`, `cargo
   clippy --all-targets -- -D warnings`, `cargo test --workspace`); run it

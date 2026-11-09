@@ -1,0 +1,9 @@
+{
+  "source_duration_seconds": 99.7,
+  "distributed_duration_seconds": 99.8,
+  "source": "Windows Cua gdigrab, 1280x800, 30fps",
+  "transcode": "fps=5,scale=960:600; libx264 crf26; unchanged timeline",
+  "sha256": "1c78913834a50a67caef11bddbd82b587a70f201e8a8795701c312c8111b26fb",
+  "tested_commit": "a097f812c1c0bad0655e008175948b15b3540d16",
+  "checks": "full source decode passed; sampled 1,21,41,61 seconds show remote uptime changing unobscured; full visible recording exceeds60 seconds"
+}

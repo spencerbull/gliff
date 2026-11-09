@@ -1,5 +1,6 @@
 [workspace]
 resolver = "2"
+default-members = ["crates/gliff", "crates/gliff-server", "crates/gliff-probe"]
 members = [
     "crates/gliff-proto",
     "crates/gliff-transport",
@@ -11,6 +12,7 @@ members = [
     "crates/gliff-vk",
     "crates/gliff-sw",
     "crates/gliff",
+    "crates/gliff-desktop",
     "crates/gliff-server",
     "crates/gliff-probe",
 ]

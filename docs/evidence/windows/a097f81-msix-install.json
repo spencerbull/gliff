@@ -1,0 +1,36 @@
+{
+  "signature": {
+    "Status": 0,
+    "StatusMessage": "Signature verified.",
+    "Thumbprint": "186B6DA3160823E95A462FA22DE1D4B7E07010D9"
+  },
+  "step": "Install",
+  "build": "a097f812c1c0bad0655e008175948b15b3540d16",
+  "utc": "2026-11-09T15:32:38.9755010Z",
+  "aliasPresent": true,
+  "after": [
+    {
+      "Name": "SpencerBull.Gliff",
+      "Version": "0.4.2.0",
+      "PackageFullName": "SpencerBull.Gliff_0.4.2.0_x64__pmj6w8rbvggwj",
+      "PackageFamilyName": "SpencerBull.Gliff_pmj6w8rbvggwj",
+      "InstallLocation": "C:\\Program Files\\WindowsApps\\SpencerBull.Gliff_0.4.2.0_x64__pmj6w8rbvggwj",
+      "Status": 0
+    }
+  ],
+  "success": true,
+  "aliasVersion": {
+    "stdout": "gliff-desktop 0.4.2\n",
+    "exitcode": 0,
+    "stderr": ""
+  },
+  "before": [],
+  "session": 1,
+  "startApps": [
+    {
+      "Name": "Gliff",
+      "AppID": "SpencerBull.Gliff_pmj6w8rbvggwj!Gliff"
+    }
+  ],
+  "user": "GLIFF-WINTEST\\glifftest"
+}

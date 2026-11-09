@@ -1,0 +1,21 @@
+{
+  "step": "Uninstall",
+  "build": "04aab37337f3d5e6cb8919408b74102ad1c32f92",
+  "utc": "2026-11-09T17:19:57.3891886Z",
+  "aliasPresent": false,
+  "after": [],
+  "success": true,
+  "before": [
+    {
+      "Name": "SpencerBull.Gliff",
+      "Version": "0.4.2.1",
+      "PackageFullName": "SpencerBull.Gliff_0.4.2.1_x64__pmj6w8rbvggwj",
+      "PackageFamilyName": "SpencerBull.Gliff_pmj6w8rbvggwj",
+      "InstallLocation": "C:\\Program Files\\WindowsApps\\SpencerBull.Gliff_0.4.2.1_x64__pmj6w8rbvggwj",
+      "Status": 0
+    }
+  ],
+  "session": 1,
+  "startApps": [],
+  "user": "GLIFF-WINTEST\\glifftest"
+}

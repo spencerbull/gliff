@@ -1,0 +1,24 @@
+{
+    "validate":  {
+                     "stdout":  "Manifest validation succeeded.\r\n",
+                     "exitcode":  0,
+                     "stderr":  "",
+                     "arguments":  "validate --manifest C:\\GliffRuntime\\validation\\winget-fixtures"
+                 },
+    "kind":  "fixture-only semantic validation, not public release availability",
+    "version":  {
+                    "stdout":  "v1.6.10121\r\n",
+                    "exitcode":  0,
+                    "stderr":  "",
+                    "arguments":  "--version"
+                },
+    "utc":  "2026-11-09T14:56:23.8670826Z",
+    "rejected_scope_control":  {
+                                   "stdout":  "Manifest validation succeeded with warnings.\r\nManifest Warning: Scope is not supported for InstallerType portable.\r\n\r\n",
+                                   "exitcode":  -1978335192,
+                                   "stderr":  "",
+                                   "arguments":  "validate --manifest C:\\GliffRuntime\\validation\\winget-scope-control"
+                               },
+    "session":  1,
+    "user":  "GLIFF-WINTEST\\glifftest"
+}

@@ -1,0 +1,46 @@
+{
+  "build": "04aab37337f3d5e6cb8919408b74102ad1c32f92",
+  "raw_original": "/home/sbull/.local/share/gliff-windows-test/shared/acceptance/evidence/gliff-04aab37-acceptance/recording.mp4",
+  "raw_sha256": "87eb14dd4589b7187140175cb9160adcb17af54f39de4c4f2c58331df4c4f99c",
+  "raw_full_decode_exit": 0,
+  "clips": [
+    {
+      "file": "04aab37-remote-session.mp4",
+      "source_start_seconds": 1000,
+      "duration_seconds": 100,
+      "processing": "continuous trim; scale 960x540; 5 fps; H.264 CRF27; original timeline speed; no audio",
+      "sha256": "921572aea0d746d20d66fab72d00182a036a0201928fefd7531922de26138bce",
+      "probe": {
+        "format": {
+          "duration": "100.000000",
+          "size": "120171"
+        }
+      },
+      "full_decode_exit": 0
+    },
+    {
+      "file": "04aab37-tabs.mp4",
+      "source_start_seconds": 1910,
+      "duration_seconds": 100,
+      "processing": "continuous trim; scale 960x540; 5 fps; H.264 CRF27; original timeline speed; no audio",
+      "sha256": "c867a95c2904bda83f56ce953bb10eb074086e2dd12c54d549d51c0cd636fdd9",
+      "probe": {
+        "format": {
+          "duration": "100.000000",
+          "size": "121740"
+        }
+      },
+      "full_decode_exit": 0
+    }
+  ],
+  "lifecycle": {
+    "file": "04aab37-dpi-msix.mp4",
+    "source": "/home/sbull/.local/share/gliff-windows-test/shared/acceptance/evidence/gliff-04aab37-dpi-msix/recording.mp4",
+    "source_sha256": "e6b53145f4340fd2bf70c0610e094b940450e7cc2605888da8d8fa761b1bed7f",
+    "source_duration_seconds": 492,
+    "source_full_decode_exit": 0,
+    "processing": "entire recording; scale 960x540; 5 fps; H.264 CRF27; original timeline speed; no audio",
+    "sha256": "8cb4c1683a62292061321782c2e76c8f9131a714eb8310e6181b24e68f1f926f",
+    "full_decode_exit": 0
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "command": "scripts/check.sh",
+  "result": "CHECK PASS",
+  "passed": 327,
+  "ignored": 1,
+  "product_revision": "04aab37337f3d5e6cb8919408b74102ad1c32f92",
+  "log_local": "/tmp/gliff-windows-infra/final-acceptance-check.log"
+}

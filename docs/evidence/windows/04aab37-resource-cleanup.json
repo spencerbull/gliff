@@ -1,0 +1,21 @@
+{
+  "owned_fixture_helpers_remaining": [],
+  "container": {
+    "name": "gliff-windows-test",
+    "status": "exited",
+    "running": false,
+    "exitcode": 0
+  },
+  "unrelated_installed_server_preserved": true,
+  "disk_retained": "~/.local/share/gliff-windows-test/storage",
+  "checkpoint_retained": "~/.local/share/gliff-windows-test/storage/checkpoints/pre-msix.qcow2",
+  "recorders_finalized": true,
+  "shutdown_recovery": {
+    "initial_docker_exit": 137,
+    "pending_windows_update_seen": "Installing 95%",
+    "recovery_desktop_verified_with_cua": true,
+    "qga_after_update": "unavailable; used Cua Start > Power > Shut down instead",
+    "final_gui_shutdown_observed": true,
+    "final_container_exit": 0
+  }
+}

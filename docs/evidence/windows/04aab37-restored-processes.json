@@ -1,0 +1,22 @@
+{
+  "phase": "restored-without-cli-host",
+  "saved": {
+    "hosts": [
+      "gliff-validation-second",
+      "gliff-validation"
+    ],
+    "tabs": [
+      "gliff-validation",
+      "gliff-validation-second"
+    ],
+    "selected": 0
+  },
+  "processes": [
+    {
+      "Name": "gliff.exe",
+      "ProcessId": 5384,
+      "ParentProcessId": 4140,
+      "ExecutablePath": "C:\\GliffAcceptance\\04aab37\\gliff.exe"
+    }
+  ]
+}

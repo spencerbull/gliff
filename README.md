@@ -25,7 +25,8 @@ both ends, and falls back to the CPU on machines where it cannot.
 
 ## Requirements
 
-- Hyprland on both machines, with a session running on the remote one.
+- A running Hyprland session on the remote machine. The Linux client also
+  needs Hyprland locally.
 - ssh access from your machine to the remote one.
 - For GPU video: an AMD or Intel GPU with its Vulkan and VA-API drivers
   (on Arch, `vulkan-radeon` and `mesa` for AMD, or `vulkan-intel` and
@@ -58,6 +59,30 @@ bin/install
 This uses the current checkout, including fixes newer than the last release.
 
 To build from source, see [docs/development.md](docs/development.md).
+
+### Windows preview in this fork
+
+The `windows-client` branch of [spencerbull/gliff](https://github.com/spencerbull/gliff)
+adds a Windows x64 client. The remote machine still runs the existing Linux
+`gliff-server`; Windows is a client, not a Hyprland server.
+
+The Windows frontend stays in Rust and shares Gliff's protocol, SSH transport,
+and OpenH264 software decoder. It uses a separate desktop window backend from
+the Linux GTK application. Initial Windows support targets US keyboard layouts
+and text clipboard sharing; Linux-specific themes, hardware video decoding,
+and image/file clipboard integration are outside this preview's scope.
+
+The build produces a portable ZIP and an MSIX package. Branch MSIX artifacts
+are unsigned test packages unless signing is explicitly configured; installing
+them requires the test-signing procedure or a trusted release signature.
+Public signing and winget submission are separate release gates.
+
+See the [Windows specification and acceptance plan](docs/windows-plan.md) for
+the required checks. Windows support remains under validation until its real
+remote-session and installer evidence is recorded.
+
+Build, package, signing, and winget preparation instructions are in
+[Windows distribution](docs/windows-packaging.md).
 
 ## Use
 
