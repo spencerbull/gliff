@@ -1,0 +1,29 @@
+{
+  "commit": "a097f812c1c0bad0655e008175948b15b3540d16",
+  "ci_run": "https://github.com/spencerbull/gliff/actions/runs/42641834504",
+  "zip_sha256": "15c045052208b30606a39c83f40e94250c77101ecaeaf373d9167e40d17de462",
+  "exe_sha256": "19428348a06e14e893d59e3d4e47434ab708d21c86f758bb03061531af61cac5",
+  "exe_bytes": 12402176,
+  "windows": "10.0.26300.9457 x64",
+  "version": "gliff-desktop 0.4.2",
+  "remote_input": [
+    {
+      "utc": "2026-11-09T15:24:38.269797+00:00",
+      "base64": "G1s8MzU7NjE7MTlNG1s8MDs2MTsxOU0bWzwwOzYxOzE5bQ==",
+      "repr": "b'\\x1b[<35;61;19M\\x1b[<0;61;19M\\x1b[<0;61;19m'"
+    },
+    {
+      "utc": "2026-11-09T15:24:38.321959+00:00",
+      "base64": "G1s8MzU7ODE7OU0=",
+      "repr": "b'\\x1b[<35;81;9M'"
+    },
+    {
+      "utc": "2026-11-09T15:24:41.450002+00:00",
+      "base64": "YQ==",
+      "repr": "b'a'"
+    }
+  ],
+  "recording_seconds": 110.733333,
+  "recording_note": "First ~80 seconds are obscured by the owned setup terminal. Does not satisfy W03 continuous visible 60-second gate. Later live-session recording was interrupted by Cua UTF-8 transport failure; no acceptance claimed.",
+  "media_path": "/home/sbull/.local/share/gliff-windows-test/shared/acceptance/evidence/recording.mp4"
+}

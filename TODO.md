@@ -173,3 +173,23 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
   dismissed; `qemu-img check` passed for
   `~/.local/share/gliff-windows-test/storage/checkpoints/pre-msix.qcow2`.
   This is a disk checkpoint, not a RAM or VSS/application-consistent snapshot.
+
+## Runtime checkpoint after renderer fix
+
+- a097f81 branch and PR CI passed (PR run 42641834504). Downloaded all three
+  artifacts and verified portable ZIP hash in the clean VM. GUI launch now
+  passes with Direct3D; real Windows SSH/H.264 video displays the isolated
+  Omarchy fixture. Screenshot and raw input/build evidence are committed in
+  docs/evidence/windows/a097f81-*.
+- Remote terminal logged Windows mouse motion/press/release and typed `a`.
+  Full W04 input acceptance remains pending the native keyboard adapter.
+- First video decodes successfully (110.733 seconds) but the setup terminal
+  obscures most frames; it does not satisfy the visible 60-second W03 gate.
+  Local media: shared/acceptance/evidence/recording.mp4.
+- Unicode clipboard test crashed Cua's test transport on invalid UTF-8.
+  Fixed broker legacy stdin/JSON encodings, quarantined pending failed requests
+  without replay, restarted only owned broker, and verified exact Unicode
+  Windows clipboard write/read. Omarchy propagation remains open. Recorder
+  confirmed disabled; Gliff PID 6720 remains live for parent-controlled tests.
+- scripts/check.sh for a097f81 passed 307 tests (1 existing ignored). Native
+  MSVC/Clippy/tests/SDK checks passed in CI; adapter changes will need reruns.
