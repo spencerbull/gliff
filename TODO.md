@@ -193,3 +193,20 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
   confirmed disabled; Gliff PID 6720 remains live for parent-controlled tests.
 - scripts/check.sh for a097f81 passed 307 tests (1 existing ignored). Native
   MSVC/Clippy/tests/SDK checks passed in CI; adapter changes will need reruns.
+
+- Active worker `windows-native-keyboard-adapter`: task suffix
+  `eb1b3bf1-d3b6-4baa-b6b7-2dc063c2f300`, T3 isolated worktree from ccbd9fc;
+  owns desktop input/main wiring, Windows dependencies/lock and client docs.
+  No VM access, external actions or subagents; cleanup owner parent.
+
+- W03 unobscured video gate passed for a097f81: 99.7 seconds, complete decode
+  passed, sampled frames show changing uptime across >60 seconds. Repository
+  copy is unchanged timeline at 960×600/5 fps (~100KB); raw30fps retained locally.
+- W07 exact Unicode both ways and focused --no-clipboard isolation passed.
+- W09 native disposable-VM lifecycle passed for a097f81: trusted matching public
+  test CER, install0.4.2.0, Start AUMID launch, alias CLI/GUI, upgrade0.4.2.1,
+  uninstall. Package, Start, alias, processes and exact test CER all absent after
+  cleanup. Raw JSON and MSIX runtime screenshot committed with this checkpoint.
+- Worker native keyboard implementation completed4bd2dd1; parent review and
+  native CI pending. Headless resize connects but does not change monitor mode;
+  inspecting server/client evidence before attributing the failure.

@@ -1,0 +1,42 @@
+{
+  "local_unicode": {
+    "content_redacted_from_telemetry": true,
+    "privacy_sensitive": true,
+    "supported": true,
+    "text": "Gliff Windows → Omarchy clipboard ✓ café 日本語",
+    "types": [
+      "CF_LOCALE",
+      "CF_OEMTEXT",
+      "CF_TEXT",
+      "CF_UNICODETEXT"
+    ]
+  },
+  "remote_to_windows": {
+    "content_redacted_from_telemetry": true,
+    "privacy_sensitive": true,
+    "supported": true,
+    "text": "Omarchy → Windows clipboard ✓ café 日本語\nsecond line",
+    "types": [
+      "CF_LOCALE",
+      "CF_OEMTEXT",
+      "CF_TEXT",
+      "CF_UNICODETEXT"
+    ]
+  },
+  "disabled_windows": {
+    "content_redacted_from_telemetry": true,
+    "privacy_sensitive": true,
+    "supported": true,
+    "text": "LOCAL-NO-CLIPBOARD-α-STABLE",
+    "types": [
+      "CF_LOCALE",
+      "CF_OEMTEXT",
+      "CF_TEXT",
+      "CF_UNICODETEXT"
+    ]
+  },
+  "windows_to_remote_observed": "Gliff Windows → Omarchy clipboard ✓ café 日本語",
+  "disabled_remote_observed": "REMOTE-NO-CLIPBOARD-β-STABLE",
+  "build": "a097f812c1c0bad0655e008175948b15b3540d16",
+  "disabled_note": "Both selections re-established after previous enabled session teardown; remained distinct while focused --no-clipboard session connected."
+}

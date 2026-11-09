@@ -24,13 +24,13 @@ in [windows-plan.md](windows-plan.md); this report records actual evidence.
 | --- | --- | --- |
 | W01 | Pass for a097f81 | Native MSVC build, Clippy, all portable tests, import/dependency checks and MakeAppx package validation passed; ZIP/MSIX/test-signed artifacts downloaded from PR run 42641834504 and checksums verified. |
 | W02 | Pass for a097f81 | Clean VM version/hash and GUI launch passed with no developer tools. Explicit dx12 backend fixed the initial surface-creation failure. Real remote screenshot and build identity are below. |
-| W03 | Partial | Real Windows SSH/H.264 session displays changing uptime. Recorded 110.73 seconds, but setup terminal obscured most of it; a continuous visible 60-second recording remains required. |
+| W03 | Pass for a097f81 | New 99.7-second unobscured real SSH/H.264 recording decoded without errors; sampled frames at 1/21/41/61 seconds show changing remote uptime. Video below. |
 | W04 | Partial | Input/release/shortcut regressions pass; Windows remote log confirms mouse press/release/motion and typed `a`. Full keyboard/chord/drag/release matrix remains pending; window-scoped native keyboard adapter planned. |
 | W05 | Partial | Geometry/DPI and reconnect epoch tests pass; real resize/cursor/DPI evidence pending. |
 | W06 | Partial | Persisted tabs and bounded reconnects tested in Rust; real UI lifecycle pending. |
-| W07 | Partial | Real protocol Unicode transfer, ownership/cancellation/generation tests pass; Windows-to-Omarchy clipboard flow pending. |
+| W07 | Pass for a097f81 | Exact Unicode text transferred both ways; focused --no-clipboard session preserved distinct local/remote selections. Raw clipboard evidence below. |
 | W08 | Partial | SSH quoting, protocol failures, deadlines and teardown tests pass; Windows runtime error/process checks pending. |
-| W09 | Pending | SDK MSIX generation and signed install/upgrade fixtures are in native CI; installation/alias/upgrade/uninstall not yet exercised. |
+| W09 | Pass for a097f81 test fixture | Verified test signature/trust, per-user install, registered AUMID launch, alias CLI/GUI, real 0.4.2.0→0.4.2.1 upgrade and uninstall. Package/Start/alias absent afterward; exact test certificate removed. |
 | W10 | Pass for branch artifacts | Branch and PR CI passed, ZIP/MSIX/test fixtures downloaded and checksums verified; native WinGet semantic validation passed. Public release hashes/URLs remain a release gate. |
 | W11 | Pass through a097f81 | `scripts/check.sh` passed fmt, Clippy with warnings denied and all 307 Linux workspace tests. Independent findings reproduced and fixed; native keyboard adapter needs its own review/check cycle. |
 
@@ -79,3 +79,29 @@ that recording. The broker now writes explicit UTF-8 bytes and reads request
 JSON as UTF-8. Native Windows clipboard write/read preserves the exact Unicode
 text; propagation to Omarchy has not yet passed. No product clipboard success
 is inferred from that automation smoke check.
+
+## Unobscured video, clipboard, and MSIX lifecycle
+
+[99.7-second real remote-session video](evidence/windows/a097f81-remote-session.mp4)
+is an unchanged timeline transcode to 960×600/5 fps for repository size.
+The 1280×800/30 fps original remains in the local acceptance evidence folder.
+[Video metadata and hash](evidence/windows/a097f81-video.json) identify the
+artifact. The complete source video decoded without errors.
+
+[Clipboard results](evidence/windows/a097f81-clipboard.json) preserve the actual
+Cua readbacks and isolated Wayland observations. Sharing requires the selected
+Gliff window to remain focused. The no-clipboard sentinels were established
+after the earlier enabled session finished teardown, then remained distinct.
+
+[MSIX install](evidence/windows/a097f81-msix-install.json),
+[upgrade](evidence/windows/a097f81-msix-upgrade.json), and
+[uninstall](evidence/windows/a097f81-msix-uninstall.json) ran in interactive
+user session 1. The registered Start AUMID launched the installed executable;
+the alias launched the upgraded executable from WindowsApps and connected to
+Omarchy.
+
+![Installed MSIX running a real remote session](evidence/windows/a097f81-msix-running.png)
+
+Only the public test CER was trusted in the disposable VM, then removed. No
+private signing key was exported. No certificate or package remains installed
+from this fixture. Public trusted signing/submission gates are unchanged.
