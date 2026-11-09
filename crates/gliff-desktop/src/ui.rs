@@ -1,9 +1,13 @@
 //! eframe/egui window adapter; no SSH, decode, or native clipboard I/O here.
+#[cfg(not(windows))]
+use crate::input::keycode;
+#[cfg(windows)]
+use crate::physical_keyboard::{win32::NativeKeyboard, Capture};
 use crate::{
     clipboard::NativeClipboard,
     config::{Options, Saved},
     geometry::Geometry,
-    input::{button_code, keycode, Held},
+    input::{button_code, Held},
     session::{Command, Session, MAX_TABS},
 };
 use eframe::egui::{
@@ -20,6 +24,8 @@ struct Tab {
     cursor: Option<(u32, TextureHandle, [u32; 2], [i32; 2])>,
     held: Held,
     captured: bool,
+    #[cfg(windows)]
+    native_capture: Option<Capture>,
     resize: Option<(u32, u32, u32)>,
     resized_at: Instant,
     connection_epoch: u64,
@@ -34,12 +40,18 @@ impl Tab {
             cursor: None,
             held: Held::default(),
             captured: false,
+            #[cfg(windows)]
+            native_capture: None,
             resize: None,
             resized_at: Instant::now(),
             connection_epoch: 0,
         }
     }
     fn release(&mut self) {
+        #[cfg(windows)]
+        {
+            self.native_capture = None;
+        }
         let active = !self.held.release().is_empty() || self.captured;
         self.captured = false;
         if active {
@@ -81,9 +93,11 @@ pub struct Desktop {
     saved: Saved,
     notice: String,
     remote_events: Option<Vec<Event>>,
+    #[cfg(windows)]
+    keyboard: NativeKeyboard,
 }
 impl Desktop {
-    pub fn new(options: Options) -> Self {
+    pub fn new(options: Options, #[cfg(windows)] keyboard: NativeKeyboard) -> Self {
         let saved = crate::config::state_path()
             .map(|p| Saved::load(&p))
             .unwrap_or_default();
@@ -105,6 +119,8 @@ impl Desktop {
             saved,
             notice: String::new(),
             remote_events: None,
+            #[cfg(windows)]
+            keyboard,
             options,
         };
         if let Some(host) = host {
@@ -172,6 +188,18 @@ impl Desktop {
 impl eframe::App for Desktop {
     fn raw_input_hook(&mut self, _ctx: &egui::Context, raw: &mut egui::RawInput) {
         self.remote_events = None;
+        #[cfg(windows)]
+        if !raw.focused
+            || raw
+                .events
+                .iter()
+                .any(|event| matches!(event, Event::WindowFocused(false)))
+        {
+            self.keyboard.disable();
+            if let Some(tab) = self.tabs.get_mut(self.selected) {
+                tab.release();
+            }
+        }
         if raw.focused && self.tabs.get(self.selected).is_some_and(|tab| tab.captured) {
             self.remote_events = Some(raw.events.clone());
             // Keep egui from using Tab/Space/Enter or remote shortcuts to
@@ -380,16 +408,51 @@ impl eframe::App for Desktop {
                 );
             }
             let response = ui.allocate_rect(available, Sense::click());
-            if response.hovered()
+            #[cfg(windows)]
+            let activate_capture = {
+                // Match the observer's latest provisional pointer-down, using
+                // its event-time position rather than the cursor's final frame
+                // position. Moving onto the picture after a local click must
+                // never promote local GUI typing into remote keyboard input.
+                let click = ctx.input(|i| capture_click(&i.events));
+                if tab.captured && click.is_some_and(|pos| !rect.contains(pos)) {
+                    tab.release();
+                }
+                !tab.captured && click.is_some_and(|pos| rect.contains(pos))
+            };
+            #[cfg(not(windows))]
+            let activate_capture = response.hovered()
                 && ui.input(|i| i.pointer.any_pressed())
-                && ui.input(|i| i.pointer.interact_pos().is_some_and(|p| rect.contains(p)))
-            {
-                tab.captured = true;
+                && ui.input(|i| i.pointer.interact_pos().is_some_and(|p| rect.contains(p)));
+            if activate_capture {
+                #[cfg(windows)]
+                {
+                    tab.native_capture = self.keyboard.capture();
+                    tab.captured = tab.native_capture.is_some();
+                }
+                #[cfg(not(windows))]
+                {
+                    tab.captured = true;
+                }
                 response.request_focus();
             }
             let focused = ctx.input(|i| i.focused);
             if !focused || (ctx.wants_keyboard_input() && !response.has_focus()) {
                 tab.release();
+            }
+            #[cfg(windows)]
+            if tab.captured {
+                if let Some(transitions) = tab.native_capture.as_ref().and_then(Capture::drain) {
+                    let messages = transitions
+                        .into_iter()
+                        .flat_map(|transition| tab.held.key(transition.code, transition.pressed))
+                        .collect();
+                    tab.input(messages);
+                } else {
+                    // Focus loss, overflow, or event-time Shift+Escape invalidated
+                    // this lease. The worker's Held owns the final remote releases.
+                    tab.release();
+                }
             }
             if tab.captured {
                 response.request_focus();
@@ -399,6 +462,7 @@ impl eframe::App for Desktop {
                     .unwrap_or_else(|| ctx.input(|i| i.events.clone()));
                 for event in events {
                     match event {
+                        #[cfg(not(windows))]
                         Event::Key {
                             key,
                             physical_key,
@@ -424,6 +488,7 @@ impl eframe::App for Desktop {
                                 }
                             }
                         }
+                        #[cfg(not(windows))]
                         Event::Copy | Event::Cut | Event::Paste(_) => {
                             // egui swallowed the physical press. Remember its
                             // modifiers, then recover the actual US position on
@@ -451,10 +516,13 @@ impl eframe::App for Desktop {
                             pos,
                             button,
                             pressed,
-                            modifiers,
+                            modifiers: _,
                         } => {
-                            let mods = tab.held.modifiers(modifiers);
-                            tab.input(mods);
+                            #[cfg(not(windows))]
+                            if let Event::PointerButton { modifiers, .. } = event {
+                                let mods = tab.held.modifiers(modifiers);
+                                tab.input(mods);
+                            }
                             if !pressed || rect.contains(pos) {
                                 let messages = tab.held.button(button_code(button), pressed);
                                 tab.input(messages);
@@ -490,6 +558,7 @@ impl eframe::App for Desktop {
                         _ => {}
                     }
                 }
+                #[cfg(not(windows))]
                 if tab.captured {
                     let mods = tab.held.modifiers(ctx.input(|i| i.modifiers));
                     tab.input(mods);
@@ -563,8 +632,21 @@ impl eframe::App for Desktop {
                 }
             }
         });
+        // Local GUI clicks do not authorize forwarding provisional key events.
+        #[cfg(windows)]
+        self.keyboard.discard_candidate();
     }
 }
+#[cfg(any(windows, test))]
+fn capture_click(events: &[Event]) -> Option<egui::Pos2> {
+    events.iter().rev().find_map(|event| match event {
+        Event::PointerButton {
+            pos, pressed: true, ..
+        } => Some(*pos),
+        _ => None,
+    })
+}
+
 fn restore_tabs(saved: &Saved) -> (Vec<Tab>, usize) {
     let tabs: Vec<_> = saved
         .tabs
@@ -590,6 +672,8 @@ fn bgra_image(width: u32, height: u32, bytes: &[u8]) -> egui::ColorImage {
 }
 impl Drop for Desktop {
     fn drop(&mut self) {
+        #[cfg(windows)]
+        self.keyboard.disable();
         for tab in &mut self.tabs {
             if let Some(session) = tab.session.take() {
                 session.disconnect();
@@ -606,6 +690,28 @@ impl Drop for Desktop {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn capture_boundary_uses_last_press_position_before_motion_or_typing() {
+        let toolbar = egui::pos2(20.0, 10.0);
+        let picture = egui::pos2(500.0, 300.0);
+        let press = |pos| Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed: true,
+            modifiers: egui::Modifiers::NONE,
+        };
+        let mut events = vec![
+            press(toolbar),
+            Event::PointerMoved(picture),
+            Event::Text("v".into()),
+        ];
+        assert_eq!(capture_click(&events), Some(toolbar));
+        events.push(press(picture));
+        events.push(Event::PointerMoved(toolbar));
+        assert_eq!(capture_click(&events), Some(picture));
+        assert_eq!(capture_click(&[Event::PointerMoved(picture)]), None);
+    }
+
     #[test]
     fn reconnect_epoch_replays_headless_geometry_and_clipboard() {
         let mut tab = Tab::new("host".into());

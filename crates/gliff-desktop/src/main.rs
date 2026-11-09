@@ -6,10 +6,21 @@ use gliff_desktop::{config::Options, ui::Desktop};
 fn main() -> eframe::Result {
     let options = Options::parse();
     let native = native_options();
+    #[cfg(windows)]
+    let (native, keyboard) =
+        gliff_desktop::physical_keyboard::win32::NativeKeyboard::install(native);
     eframe::run_native(
         "Gliff",
         native,
-        Box::new(move |_| Ok(Box::new(Desktop::new(options)))),
+        Box::new(move |_context| {
+            #[cfg(windows)]
+            keyboard.bind(_context)?;
+            Ok(Box::new(Desktop::new(
+                options,
+                #[cfg(windows)]
+                keyboard,
+            )))
+        }),
     )
 }
 

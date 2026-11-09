@@ -75,22 +75,44 @@ Click the picture to forward keyboard, pointer buttons, dragging and wheel
 input. Shift+Escape releases all held remote keys/buttons and returns input
 to the local UI. Clicking local controls, leaving the window, changing tabs,
 disconnecting and closing also release remote input. Alt, Ctrl and Shift
-states are synchronized even when their press/release has no separate egui key
-event. The worker independently tracks held input and attempts releases plus
-`Bye` before closing the transport. A broken connection can prevent delivery;
-the remote server must also clean up its virtual input when the stream closes.
+states on Windows come from own-window physical messages, including distinct
+left/right modifiers. The worker independently tracks held input and attempts
+releases plus `Bye` before closing the transport. A broken connection can
+prevent delivery; the remote server must also clean up its virtual input when
+the stream closes.
 
-Physical US QWERTY positions map to evdev codes, and the client supplies a US
-XKB keymap to the remote server. Other layouts, IMEs and compose/dead-key input
-are not supported. Left/right modifier distinctions, Caps Lock, numpad-specific
-positions and keys absent from egui's key model are not fully represented.
-The egui-winit Windows adapter does not expose the Windows/Super modifier, so
-this client does **not** forward it. OS-reserved shortcuts such as Ctrl+Alt+Del
-and many Windows-key combinations cannot be captured. No full keyboard parity
-is claimed. Because egui consumes clipboard shortcut presses, their physical
-key chords are recovered on key release, including Ctrl+Insert/Shift+Insert;
-ordinary keys are forwarded on press/release. Remote key repeat comes from
-the server's keymap, rather than repeated network press events.
+On Windows, a winit message observer forwards keyboard transitions only from
+Gliff's own UI-thread/window `WM_KEYDOWN/UP` and `WM_SYSKEYDOWN/UP` messages. It
+never installs a global keyboard hook, records other windows' input, or consumes
+OS messages. Set-1
+physical positions map to evdev, including right Ctrl/Alt/Shift, navigation,
+Caps Lock, numpad Enter/slash and Windows keys when the OS delivers them.
+VK-only synthetic messages use `MapVirtualKeyW` as a best-effort fallback;
+without physical scan information they cannot distinguish every position.
+E1/Pause and unrecognized scan codes are unsupported. Other layouts, IMEs and
+compose/dead-key input are unsupported; the remote keymap remains US QWERTY.
+OS-reserved shortcuts such as Ctrl+Alt+Del and many Windows-key combinations
+remain local. This adapter does not promise global interception or full parity.
+
+A bounded 256-transition queue preserves event-time order even when egui turns
+Ctrl+V/C/X or Insert shortcuts into clipboard events. While captured, the UI
+ignores egui keyboard/clipboard events and generic modifier synthesis; physical
+transitions alone feed the existing held-input lifecycle. Remote repeat comes
+from the server keymap; repeated local downs are ignored. With capture off,
+local GUI text entry and shortcuts retain their usual egui behavior. The
+non-Windows frontend retains its existing egui input path.
+
+An own-window pointer-down marks a provisional capture boundary and samples
+only already-held left/right modifiers using this thread's `GetKeyState`.
+If egui accepts that click on the picture, queued transitions after the click
+are retained; earlier local typing is excluded. Local-control clicks discard
+provisional events. Capture leases have epochs: focus loss (including loss and
+regain within one frame), tab/connection changes, Shift+Escape or queue overflow
+invalidate the lease, discard pending transitions and release remote keys and
+buttons. Overflow requires another picture click. Dropping a stale lease cannot
+disable a newer capture. OS observation and egui decisions run on the same UI
+thread, so accepting a boundary and draining its queue cannot race message
+insertion. This behavior still needs native Windows runtime verification.
 
 The picture is aspect fitted with letterboxing. Pointer mapping uses the
 displayed frame's geometry and the server's stream scale; local DPI enters
@@ -167,23 +189,28 @@ latency is governed by the operating system.
 
 Automated Linux tests cover real protocol sessions with OpenH264 encode/decode
 in both chroma modes, latest picture replacement, physical key mapping and
-modifier cleanup, letterbox/DPI geometry, headless resize gating, Unicode
-clipboard flow/caps/withdrawal, persisted disconnected tabs, framing limits,
-unknown messages, bounded retries/timeouts, SSH command quoting/security flags,
+modifier cleanup, physical chord ordering and both modifier release orders,
+Ctrl+Shift+V and Ctrl+V after Shift release, extended/right-side positions,
+synthetic scan fallback, provisional capture boundaries, repeat filtering,
+overflow/epoch/focus cleanup, letterbox/DPI geometry, headless resize gating,
+Unicode clipboard flow/caps/withdrawal, persisted disconnected tabs, framing
+limits, unknown messages, bounded retries/timeouts, SSH command quoting/security flags,
 authentication/host-key diagnostics, and SSH process termination/reaping.
 
 Commands for this scoped implementation:
 
 ```sh
 cargo fmt -p gliff-desktop -- --check
-cargo clippy -p gliff-desktop -p gliff-proto -p gliff-transport -p gliff-sw --all-targets -- -D warnings
-cargo test -p gliff-desktop -p gliff-proto -p gliff-transport -p gliff-sw
+cargo clippy -p gliff-desktop --all-targets -- -D warnings
+cargo test -p gliff-desktop --all-targets
 cargo check -p gliff-desktop --target x86_64-pc-windows-msvc
 ```
 
 The last command was attempted on Linux with the MSVC Rust target installed,
 but OpenH264's C++ build could not find MSVC tools/`lib.exe`. It does not prove
-a native Windows build. Native Windows build, installation, real SSH session,
-60-second video, DPI/input/cursor, multi-tab and OS clipboard evidence belong
+a native Windows build. An isolated adapter-only cross-target check against the
+actual Windows eframe/winit/Win32 dependencies passes; it excludes the session
+and desktop UI and is not runtime evidence. Native Windows build, installation,
+real SSH session, 60-second video, DPI/input/cursor, multi-tab and OS clipboard evidence belong
 to the parent validation stream and remain open here. Packaging, CI, public
 signing, release and winget publication are outside this implementation.
