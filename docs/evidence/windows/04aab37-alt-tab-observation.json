@@ -1,0 +1,7 @@
+{
+  "alt_tab_attempted": true,
+  "alt_tab_persistent_blur_not_established": true,
+  "post_alt_tab_z_appended_bytes": 78,
+  "post_alt_tab_z_unmodified": true,
+  "note": "Discarded assumption that capture was inactive; repeating focus-loss validation with authoritative minimized state."
+}

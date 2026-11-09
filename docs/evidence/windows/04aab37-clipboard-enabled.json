@@ -1,0 +1,33 @@
+{
+  "windows_to_omarchy": {
+    "expected": "Windows → Omarchy / café / 日本語 / 😀 / 04aab37",
+    "actual": "Windows → Omarchy / café / 日本語 / 😀 / 04aab37"
+  },
+  "omarchy_to_windows": {
+    "expected": "Omarchy → Windows / naïve / Ελληνικά / 🚀 / 04aab37",
+    "response": {
+      "jsonrpc": "2.0",
+      "id": "8efd4b76cf814dd08181a4ceca20bcee",
+      "result": {
+        "content": [
+          {
+            "text": "Clipboard read succeeded (4 available type(s); text requested).",
+            "type": "text"
+          }
+        ],
+        "structuredContent": {
+          "content_redacted_from_telemetry": true,
+          "privacy_sensitive": true,
+          "supported": true,
+          "text": "Omarchy → Windows / naïve / Ελληνικά / 🚀 / 04aab37",
+          "types": [
+            "CF_LOCALE",
+            "CF_OEMTEXT",
+            "CF_TEXT",
+            "CF_UNICODETEXT"
+          ]
+        }
+      }
+    }
+  }
+}

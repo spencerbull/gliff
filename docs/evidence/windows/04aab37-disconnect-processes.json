@@ -1,0 +1,17 @@
+{
+  "phase": "first-tab-disconnected",
+  "processes": [
+    {
+      "Name": "gliff.exe",
+      "ProcessId": 4880,
+      "ParentProcessId": 11904,
+      "ExecutablePath": "C:\\GliffAcceptance\\04aab37\\gliff.exe"
+    },
+    {
+      "Name": "ssh.exe",
+      "ProcessId": 10648,
+      "ParentProcessId": 4880,
+      "ExecutablePath": "C:\\WINDOWS\\System32\\OpenSSH\\ssh.exe"
+    }
+  ]
+}

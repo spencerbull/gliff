@@ -24,20 +24,44 @@ known hurdles, explicit acceptance tests, and evidence requirements.
    transport and gliff-sw; no macOS implementation found.
 2. [x] Define Windows scope and validation plan before implementation.
 3. [x] Implement Windows desktop client, input, session lifecycle and tests.
-   Worker a2f113f integrated as 9bb96b1; native Windows acceptance still open.
+   Worker a2f113f integrated as 9bb96b1; final native acceptance passed.
 4. [x] Implement portable ZIP, MSIX, winget preparation and branch CI.
-   Worker 1eeca65 integrated as a542881; fixture/static checks pass, native SDK
-   packaging/install checks still open.
+   Worker 1eeca65 integrated as a542881; native SDK and install lifecycle passed.
 5. [x] Establish isolated Windows runtime and a test Hyprland server.
    Live Cua GUI/clipboard/video checks, QGA, pinned-key SSH authentication and
    actual Windows version verified. Product acceptance remains separate.
-6. [ ] Pass native Windows build/tests and Linux regression checks.
-7. [ ] Capture real session and installer screenshot/video evidence.
-8. [ ] Independent review, fix verified findings, repeat affected checks.
+6. [x] Pass native Windows build/tests and Linux regression checks.
+7. [x] Capture real session and installer screenshot/video evidence.
+8. [x] Independent review, fix verified findings, repeat affected checks.
 9. [x] Push branch and open a draft PR in spencerbull's fork.
-   https://github.com/spencerbull/gliff/pull/1 (draft; verification ongoing).
+   https://github.com/spencerbull/gliff/pull/1 (draft for user testing; acceptance evidence below).
 
-## Work streams and ownership
+## Current checkpoint
+
+- Final product revision: `04aab37337f3d5e6cb8919408b74102ad1c32f92`.
+  Later commits contain documentation/evidence only.
+- **W01–W11 passed**; [final acceptance matrix](docs/windows-validation.md)
+  links native CI, real Windows screenshots/videos, raw input/clipboard/process
+  assertions, DPI/resize, two independent sessions, reconnect, and MSIX lifecycle.
+- Native PR run 42653722673 and branch run 42653679100 passed. Full Linux checks:
+ 327 tests, one existing ignored. All confirmed independent-review findings
+  reproduced/fixed with regressions and defect mutations. No active workers.
+- Final MSIX installed 0.4.2.0, launched registered Start AUMID, upgraded 0.4.2.1,
+  launched alias GUI/CLI and uninstalled. Exact test CER removed; no package,
+  Start entry, alias, Gliff or SSH processes remain in the guest.
+- Final docs/evidence are included in the fork branch; the PR shows CI status
+  for its latest head. The exact tested product revision remains04aab37.
+  Public trusted signing, stable release URLs and actual winget submission are
+  manual release gates; no release/submission/merge is authorized or performed.
+- Runtime cleanup owner: parent. Final shutdown verified below; retain the owned
+  Windows VM disk and checkpoint for user testing. All recordings finalized.
+
+## Work streams and ownership (allocation history)
+
+The records below preserve the engineering trail. Older pending/blocking notes
+were resolved by the final matrix above unless explicitly listed as release gates.
+
+
 
 Backend: T3 Code. Parent owns integration, root Cargo manifests/lockfile, plan,
 README, regression checks, test infrastructure and evidence. Workers may not
@@ -53,7 +77,7 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
 | Review | Independent distribution review | T3 child `windows-packaging-review`, task suffix `fbe6c910-fcb9-4b9f-b020-d3c8daa45a5f`, shared checkout read-only | Completed: one P2, portable WinGet stanza must omit Scope. Parent verified upstream WinGet semantic validator, added failing regression, removed Scope only for portable; all 26 fixtures and 3 schemas now pass. Native winget CLI check pending. |
 | Desktop review | Independent client review | T3 child `windows-desktop-independent-review`, task suffix `06dcfbcb-0632-411a-8abe-9f8648491047`, shared checkout read-only | Completed: four P2 findings (late remote clipboard, reconnect geometry, reconnect offer, empty clipboard paste). Parent verified source/probes and added selection generations, connection epochs, modifier history, regressions. Final checks in progress. |
 
-## Required gates and open questions
+## Engineering log and original gates (historical)
 
 - Run `scripts/check.sh` before every push (repository CLAUDE.md). Local
   GTK 4.24.1 and libadwaita 1.10.0 are installed (`libadwaita-1` is the correct
@@ -140,7 +164,7 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
   Initial HTTPS push lacked a credential helper; command-scoped authenticated
   `gh auth git-credential` helper worked without changing global Git settings.
 
-## Runtime resources created by this loop
+## Runtime resources created by this loop (inventory; final state below)
 
 - Container `gliff-windows-test` on the local host (omaprox unavailable), pinned
   image `dockurr/windows@sha256:16fd7c39a3e48bb946d29c59dc6015942e5b900a1fa5d7e5552053bfc48ee2ea`.
@@ -174,7 +198,7 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
   `~/.local/share/gliff-windows-test/storage/checkpoints/pre-msix.qcow2`.
   This is a disk checkpoint, not a RAM or VSS/application-consistent snapshot.
 
-## Runtime checkpoint after renderer fix
+## Runtime checkpoint after renderer fix (historical)
 
 - a097f81 branch and PR CI passed (PR run 42641834504). Downloaded all three
   artifacts and verified portable ZIP hash in the clean VM. GUI launch now
@@ -297,3 +321,46 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
 - Source04aab37 pushed and linked after327-test fullcheck; nativeCI pending.
   Next worker may create only a second independent fixture under server-second/;
   parent remains sole Windows/controller and owns testsshd/relay integration.
+
+- Active runtime fixture worker `second-isolated-omarchy-fixture`, task suffix
+  2f3e7cbd-f983-4118-a061-a8253a2da3fc, shared repo read-only; owns only new
+  server-second/ files and processes. Must not touch first compositor, Windows,
+  testsshd/relay or user config. Parent owns integration and cleanup.
+-04aab37 native branch/PR CI both passed. Final artifacts being retrieved for
+  complete Windows input/DPI/tab/reconnect and MSIX rerun.
+
+- Final04aab37 native acceptance: A, Ctrl+Shift+V, Shift+1, Delete, NumLock
+  down/up, initial double click, literalgliff, drag, allfour wheel directions,
+  Ctrl+click and Shift+Escape passed against independent remote event logs.
+  Minimize was authoritatively observed, then restore kept input local: both
+  posted and real foregroundq produced no remote bytes until explicit picture
+  recapture; recapturedq arrived unmodified. Earlier AltTab returned toGliff,
+  so that probe alone was inconclusive for persistent blur; no false pass.
+- Second fixture worker completed and report verified. Parent added only
+  allowlistedGLIFF_TEST_INSTANCE selector to ownedsshd/wrapper and second
+  pinned SSH alias. Native two-tab UI acceptance is inprogress.
+- Current native Windows app04aab37 PID4880/HWND983316, portable at
+  C:\GliffAcceptance\04aab37\gliff.exe. Final testMSIX0.4.2.0 installed;
+  upgrade/uninstall and exactCER cleanup remain. Recorder active at
+  C:\GliffRuntime\evidence\gliff-04aab37-acceptance; parentmust finalize.
+
+
+## Final runtime checkpoint
+
+- W01–W11 acceptance passed on product04aab37. Both portable and installed
+  app connected to real isolated Omarchy sessions. Final report and linked raw
+  assertions/screenshots/video are in docs/windows-validation.md.
+- Final492-second DPI/MSIX video and original2136.6-second recording finalized
+  and decoded successfully. Both100-second continuous excerpts decoded too.
+- Guest package/Start/alias absent, exact test certificate removed, no Gliff/SSH
+  processes. Both test compositors/terminals/loggers, owned sshd, host relay,
+  test viewer and host Cua bootstrap stopped. No active workers.
+- Owned container gliff-windows-test initially hit Docker exit137 at its 30s stop
+  timeout during Windows Update. Recovery boot completed to the real desktop;
+  Cua Start > Power > Shut down then exited the container cleanly (exit0).
+  QGA was unavailable after the update; GUI shutdown was the verified fallback. VM disk and verified
+  pre-MSIX disk checkpoint retained for user testing. No real user server or
+  desktop session was stopped; unrelated installed server1672890 preserved.
+  Resource evidence: docs/evidence/windows/04aab37-resource-cleanup.json.
+- Public signing/release/winget submission remain manual gates outside this
+  implementation/testing scope. No merge, release or submission performed.

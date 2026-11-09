@@ -1,0 +1,47 @@
+{
+  "second_selected": {
+    "first": [],
+    "second": [
+      {
+        "utc": "2026-11-09T17:05:38.349115+00:00",
+        "base64": "G1s8MzU7ODM7MTZNG1s8MDs4MzsxNk0bWzwwOzgzOzE2bQ==",
+        "repr": "b'\\x1b[<35;83;16M\\x1b[<0;83;16M\\x1b[<0;83;16m'"
+      },
+      {
+        "utc": "2026-11-09T17:05:38.455745+00:00",
+        "base64": "G1s8MzU7NDM7MTZN",
+        "repr": "b'\\x1b[<35;43;16M'"
+      },
+      {
+        "utc": "2026-11-09T17:05:41.883464+00:00",
+        "base64": "Yg==",
+        "repr": "b'b'"
+      }
+    ]
+  },
+  "first_selected": {
+    "first": [
+      {
+        "utc": "2026-11-09T17:06:02.501090+00:00",
+        "base64": "G1s8MzU7NjY7MTJNG1s8MDs2NjsxMk0=",
+        "repr": "b'\\x1b[<35;66;12M\\x1b[<0;66;12M'"
+      },
+      {
+        "utc": "2026-11-09T17:06:02.506173+00:00",
+        "base64": "G1s8MDs2NjsxMm0=",
+        "repr": "b'\\x1b[<0;66;12m'"
+      },
+      {
+        "utc": "2026-11-09T17:06:02.551526+00:00",
+        "base64": "G1s8MzU7MzI7MTJN",
+        "repr": "b'\\x1b[<35;32;12M'"
+      },
+      {
+        "utc": "2026-11-09T17:06:06.044478+00:00",
+        "base64": "YQ==",
+        "repr": "b'a'"
+      }
+    ],
+    "second": []
+  }
+}

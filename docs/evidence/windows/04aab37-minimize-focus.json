@@ -1,0 +1,8 @@
+{
+  "confirmed_minimized": true,
+  "inactive_before": 5433,
+  "inactive_after": 5433,
+  "blocked": true,
+  "foreground_inactive_q_blocked": true,
+  "recaptured_q": "{\"utc\": \"2026-11-09T17:03:44.185917+00:00\", \"base64\": \"cQ==\", \"repr\": \"b'q'\"}\n"
+}

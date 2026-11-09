@@ -1,0 +1,10 @@
+{
+  "phase": "upgraded-alias-launch",
+  "sha256": "C4C5FD00FA21A1F225D654253C56F18D3ACCD20D4262194E96E7E0EC65948437",
+  "process": {
+    "Name": "gliff.exe",
+    "ProcessId": 12120,
+    "ParentProcessId": 7004,
+    "ExecutablePath": "C:\\Program Files\\WindowsApps\\SpencerBull.Gliff_0.4.2.1_x64__pmj6w8rbvggwj\\gliff.exe"
+  }
+}

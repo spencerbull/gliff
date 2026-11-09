@@ -1,0 +1,15 @@
+{
+  "phase": "installed-start-aumid-launch",
+  "package": {
+    "Name": "SpencerBull.Gliff",
+    "Version": "0.4.2.0",
+    "Status": 0
+  },
+  "sha256": "C4C5FD00FA21A1F225D654253C56F18D3ACCD20D4262194E96E7E0EC65948437",
+  "process": {
+    "Name": "gliff.exe",
+    "ProcessId": 8084,
+    "ParentProcessId": 5812,
+    "ExecutablePath": "C:\\Program Files\\WindowsApps\\SpencerBull.Gliff_0.4.2.0_x64__pmj6w8rbvggwj\\gliff.exe"
+  }
+}
