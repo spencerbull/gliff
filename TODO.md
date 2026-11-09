@@ -126,6 +126,13 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
   bugs and no new clipboard/epoch/MSIX fixture defects. Parent reproduced both
   with new failing tests, retained full modifier chords through releases and
   batched events; all six input tests now pass. Full checks/native rerun pending.
+- Further input analysis identified egui's missing original key-down/modifier
+  timing as the source of ambiguous shortcut reconstruction. A bounded Windows
+  adapter will capture only messages delivered to Gliff's own winit event loop,
+  forward physical keys directly and keep reserved Windows shortcuts local.
+  No global keyboard hook. Separate worker/worktree owns it while parent tests
+  the already-built renderer and installer; final Windows input acceptance will
+  use that adapter rather than heuristics.
 - Native WinGet CLI validation passed for fixed fixture manifests, while the
   identical Scope:user negative control returned nonzero with the expected
   warning. Raw evidence is committed in docs/evidence/windows/.
@@ -161,3 +168,8 @@ a T3-managed isolated worktree. Cleanup owner for all workers is parent.
 - Cleanup owner: parent. Stop container, test sshd, nested compositor and its
   children after evidence collection; retain test disk only for continued user
   testing, document final resource state. Never stop unrelated sessions.
+- Pre-MSIX crash-consistent disk checkpoint completed through QEMU's live backup
+  job (`data3`, full 100 GB logical range). Backup job concluded without error,
+  dismissed; `qemu-img check` passed for
+  `~/.local/share/gliff-windows-test/storage/checkpoints/pre-msix.qcow2`.
+  This is a disk checkpoint, not a RAM or VSS/application-consistent snapshot.
